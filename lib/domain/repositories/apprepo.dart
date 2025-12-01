@@ -1,0 +1,659 @@
+// lib/repository/app_repo.dart
+import 'dart:developer';
+import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:zestyvibe/domain/models/cartItem_model.dart';
+import 'package:zestyvibe/domain/models/product_detail_model.dart';
+import 'package:zestyvibe/domain/models/product_model.dart';
+import 'package:zestyvibe/domain/token_storage.dart';
+
+import 'package:zestyvibe/core/urls.dart';
+import 'package:zestyvibe/core/credentials.dart';
+
+class ApiResponse<T> {
+  final T? data;
+  final String message;
+  final bool error;
+  final int status;
+
+  ApiResponse({
+    this.data,
+    required this.message,
+    required this.error,
+    required this.status,
+  });
+}
+
+/// Small container for paginated products returned by fetchProducts()
+class PaginatedProducts {
+  final List<ProductModel> products;
+  final bool hasNextPage;
+  final String? endCursor;
+
+  PaginatedProducts({
+    required this.products,
+    required this.hasNextPage,
+    required this.endCursor,
+  });
+}
+
+class AppRepo {
+  static AppRepo? _instance;
+  static AppRepo get instance {
+    if (_instance == null)
+      throw Exception('AppRepo not initialized. Call AppRepo.init() first.');
+    return _instance!;
+  }
+
+  final Dio dio;
+  final TokenStorage _tokenStorage = TokenStorage();
+
+  // Toggle this to false for production to avoid verbose logs
+  final bool _debug = true;
+
+  String? _storeDomain;
+  String? _storefrontToken;
+
+  AppRepo._internal({required this.dio});
+
+  static Future<void> init({Dio? dio}) async {
+    if (_instance != null) return;
+
+    final tokenStorage = TokenStorage();
+    final storedDomain = await tokenStorage.readDomain();
+    final storedToken = await tokenStorage.readToken();
+
+    final domain = storedDomain ?? Credentials.storeDomain;
+    final token = storedToken ?? Credentials.storefrontToken;
+
+    final baseUrl = domain.isNotEmpty
+        ? 'https://$domain/api/${Urls.apiVersion}/graphql.json'
+        : Urls.baseUrl;
+
+    final options = BaseOptions(
+      baseUrl: baseUrl,
+      headers: {
+        'Content-Type': 'application/json',
+        if (token.isNotEmpty && token != '<PASTE_YOUR_STOREFRONT_TOKEN_HERE>')
+          'X-Shopify-Storefront-Access-Token': token,
+      },
+      connectTimeout: const Duration(seconds: 10),
+      receiveTimeout: const Duration(seconds: 15),
+    );
+
+    final usedDio = dio ?? Dio(options);
+    _instance = AppRepo._internal(dio: usedDio);
+    _instance!._storeDomain = domain.isNotEmpty ? domain : null;
+    _instance!._storefrontToken =
+        (token.isNotEmpty && token != '<PASTE_YOUR_STOREFRONT_TOKEN_HERE>')
+            ? token
+            : null;
+  }
+
+  bool get hasCredentials => _storeDomain != null && _storefrontToken != null;
+
+  Future<void> setDomainAndToken({
+    required String domain,
+    required String token,
+  }) async {
+    await _tokenStorage.save(domain, token);
+    _storeDomain = domain;
+    _storefrontToken = token;
+    dio.options.baseUrl = 'https://$domain/api/${Urls.apiVersion}/graphql.json';
+    dio.options.headers['X-Shopify-Storefront-Access-Token'] = token;
+  }
+
+  Future<void> clearCredentials() async {
+    await _tokenStorage.deleteDomain();
+    await _tokenStorage.deleteToken();
+    _storeDomain = null;
+    _storefrontToken = null;
+    dio.options.headers.remove('X-Shopify-Storefront-Access-Token');
+    dio.options.baseUrl = Urls.baseUrl;
+  }
+
+  Future<ApiResponse<dynamic>> graphQL(
+    String query, {
+    Map<String, dynamic>? variables,
+  }) async {
+    try {
+      if (_debug) {
+        debugPrint('--- GraphQL REQUEST ---');
+        debugPrint(query.replaceAll('\n', ' '));
+        if (variables != null && variables.isNotEmpty) {
+          debugPrint('Variables: $variables');
+        }
+      }
+
+      final res = await dio.post(
+        "",
+        data: {'query': query, if (variables != null) 'variables': variables},
+      );
+
+      if (_debug) {
+        debugPrint('--- GraphQL RAW RESPONSE ---');
+        debugPrint(res.data?.toString() ?? '<<no data>>');
+      }
+
+      final data = res.data as Map<String, dynamic>;
+
+      if (data['errors'] != null) {
+        final message = (data['errors'] as List).isNotEmpty
+            ? data['errors'][0]['message']
+            : 'GraphQL error';
+        if (_debug) debugPrint('GraphQL ERRORS: ${data['errors']}');
+        return ApiResponse(
+          data: null,
+          message: message ?? 'GraphQL error',
+          error: true,
+          status: 400,
+        );
+      }
+
+      return ApiResponse(
+        data: data['data'],
+        message: 'Success',
+        error: false,
+        status: 200,
+      );
+    } on DioException catch (e) {
+      if (_debug) debugPrint('DioException: ${e.message}');
+      log(e.toString());
+      return ApiResponse(
+        data: null,
+        message: 'Network or server error occurred',
+        error: true,
+        status: 500,
+      );
+    } catch (e, s) {
+      if (_debug) debugPrint('Unexpected error: $e');
+      log('$e\n$s');
+      return ApiResponse(
+        data: null,
+        message: 'Unexpected error',
+        error: true,
+        status: 500,
+      );
+    }
+  }
+
+  /// Fetch products with optional cursor-based pagination.
+  /// `first` - number of products to fetch (Shopify max 250 per call)
+  /// `after` - optional cursor to fetch next page
+  Future<ApiResponse<PaginatedProducts>> fetchProducts({
+    int first = 12,
+    String? after,
+  }) async {
+    const query = r'''
+      query Products($first: Int!, $after: String) {
+        products(first: $first, after: $after) {
+          edges {
+            node {
+              id
+              title
+              handle
+              description
+              images(first:1) {
+                edges { node { url altText } }
+              }
+              variants(first:1) {
+                edges {
+                  node {
+                    id
+                    title
+                    sku
+                    price {
+                      amount
+                      currencyCode
+                    }
+                  }
+                }
+              }
+            }
+          }
+          pageInfo {
+            hasNextPage
+            endCursor
+          }
+        }
+      }
+    ''';
+
+    final resp = await graphQL(query, variables: {'first': first, if (after != null) 'after': after});
+    if (resp.error) {
+      return ApiResponse(
+        data: null,
+        message: resp.message,
+        error: true,
+        status: resp.status,
+      );
+    }
+
+    final productsData = resp.data?['products'] ?? {};
+    final extracted = (productsData['edges'] as List<dynamic>?) ?? [];
+    final products = extracted.map<ProductModel>((e) {
+      final node = e['node'] as Map<String, dynamic>;
+      return ProductModel.fromGraphQL(node);
+    }).toList();
+
+    final pageInfo = productsData['pageInfo'] as Map<String, dynamic>?;
+
+    final paginated = PaginatedProducts(
+      products: products,
+      hasNextPage: pageInfo?['hasNextPage'] as bool? ?? false,
+      endCursor: pageInfo?['endCursor'] as String?,
+    );
+
+    return ApiResponse(
+      data: paginated,
+      message: 'Success',
+      error: false,
+      status: 200,
+    );
+  }
+
+  /// Fetch single product by handle
+  /// NOTE: metafields removed to avoid "missing required arguments" errors.
+  Future<ApiResponse<ProductDetailModel>> fetchProductByHandle({
+    required String handle,
+  }) async {
+    const query = r'''
+      query ProductByHandle($handle: String!) {
+        productByHandle(handle: $handle) {
+          id
+          title
+          handle
+          descriptionHtml
+          images(first: 10) {
+            edges {
+              node {
+                url
+                altText
+                width
+                height
+              }
+            }
+          }
+          variants(first: 50) {
+            edges {
+              node {
+                id
+                title
+                sku
+                availableForSale
+                selectedOptions {
+                  name
+                  value
+                }
+                price {
+                  amount
+                  currencyCode
+                }
+                image {
+                  url
+                  altText
+                }
+              }
+            }
+          }
+        }
+      }
+    ''';
+
+    final resp = await graphQL(query, variables: {'handle': handle});
+    if (resp.error) {
+      if (_debug) debugPrint('fetchProductByHandle error for handle=$handle : ${resp.message}');
+      return ApiResponse(
+        data: null,
+        message: resp.message,
+        error: true,
+        status: resp.status,
+      );
+    }
+
+    final productData = resp.data?['productByHandle'];
+    if (productData == null) {
+      if (_debug) debugPrint('ProductByHandle returned null for handle: $handle. Full data: ${resp.data}');
+      return ApiResponse(
+        data: null,
+        message: 'Product not found',
+        error: true,
+        status: 404,
+      );
+    }
+
+    try {
+      final model = ProductDetailModel.fromGraphQL(productData as Map<String, dynamic>);
+      return ApiResponse(
+        data: model,
+        message: 'Success',
+        error: false,
+        status: 200,
+      );
+    } catch (e, s) {
+      if (_debug) {
+        debugPrint('Parsing product detail failed: $e');
+        debugPrint('Raw product map: $productData');
+      }
+      log('$e\n$s');
+      return ApiResponse(
+        data: null,
+        message: 'Parsing product data failed',
+        error: true,
+        status: 500,
+      );
+    }
+  }
+  ///////////////////cart///////////////////////////////
+    static const String _kLocalCartKey = '_local_cart_id';
+
+  Future<void> _saveLocalCartId(String id) async {
+    try {
+      final sp = await SharedPreferences.getInstance();
+      await sp.setString(_kLocalCartKey, id);
+    } catch (_) {}
+  }
+
+  Future<String?> _readLocalCartId() async {
+    try {
+      final sp = await SharedPreferences.getInstance();
+      return sp.getString(_kLocalCartKey);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// PUBLIC method to clear locally stored cart ID
+  Future<void> clearLocalCartId() async {
+    try {
+      final sp = await SharedPreferences.getInstance();
+      await sp.remove(_kLocalCartKey);
+    } catch (_) {}
+  }
+
+
+  /// Create a new cart with optional initial lines.
+  Future<ApiResponse<CartModel>> createCart({
+    List<Map<String, dynamic>>? lines, // each { merchandiseId: gid, quantity: int }
+  }) async {
+    const mutation = r'''
+      mutation cartCreate($input: CartInput!) {
+        cartCreate(input: $input) {
+          cart {
+            id
+            checkoutUrl
+            totalQuantity
+            estimatedCost { totalAmount { amount currencyCode } }
+            lines(first: 100) { edges { node { id quantity merchandise { ... on ProductVariant { id title product { title } image { url } price { amount currencyCode } } } } } }
+          }
+          userErrors { field message }
+        }
+      }
+    ''';
+
+    final input = <String, dynamic>{};
+    if (lines != null && lines.isNotEmpty) input['lines'] = lines;
+
+    final resp = await graphQL(mutation, variables: {'input': input});
+    if (resp.error) return ApiResponse(data: null, message: resp.message, error: true, status: resp.status);
+
+    final payload = resp.data?['cartCreate'];
+    if (payload == null) return ApiResponse(data: null, message: 'Invalid response', error: true, status: 500);
+
+    final errors = payload['userErrors'] as List<dynamic>? ?? [];
+    if (errors.isNotEmpty) {
+      final msg = (errors.first['message'] ?? 'Cart create error').toString();
+      return ApiResponse(data: null, message: msg, error: true, status: 400);
+    }
+
+    final cartMap = payload['cart'] as Map<String, dynamic>?;
+    if (cartMap == null) return ApiResponse(data: null, message: 'No cart object', error: true, status: 500);
+
+    final cart = CartModel.fromGraphQL(cartMap);
+    await _saveLocalCartId(cart.id);
+    return ApiResponse(data: cart, message: 'Success', error: false, status: 200);
+  }
+
+  /// Fetch cart by id (id from local or supplied)
+  Future<ApiResponse<CartModel>> fetchCart({String? cartId}) async {
+    final id = cartId ?? await _readLocalCartId();
+    if (id == null) return ApiResponse(data: null, message: 'No cart id', error: true, status: 404);
+
+    const query = r'''
+      query getCart($id: ID!) {
+        cart(id: $id) {
+          id
+          checkoutUrl
+          totalQuantity
+          estimatedCost { totalAmount { amount currencyCode } }
+          lines(first: 250) {
+            edges {
+              node {
+                id
+                quantity
+                merchandise {
+                  ... on ProductVariant {
+                    id
+                    title
+                    product { title }
+                    image { url }
+                    price { amount currencyCode }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    ''';
+
+    final resp = await graphQL(query, variables: {'id': id});
+    if (resp.error) return ApiResponse(data: null, message: resp.message, error: true, status: resp.status);
+
+    final cartMap = resp.data?['cart'] as Map<String, dynamic>?;
+    if (cartMap == null) return ApiResponse(data: null, message: 'Cart not found', error: true, status: 404);
+
+    final cart = CartModel.fromGraphQL(cartMap);
+    return ApiResponse(data: cart, message: 'Success', error: false, status: 200);
+  }
+
+  /// Add lines to cart
+  Future<ApiResponse<CartModel>> addLines({
+    required String cartId,
+    required List<Map<String, dynamic>> lines, // [{ merchandiseId, quantity }]
+  }) async {
+    const mutation = r'''
+      mutation cartLinesAdd($cartId: ID!, $lines: [CartLineInput!]!) {
+        cartLinesAdd(cartId: $cartId, lines: $lines) {
+          cart {
+            id
+            checkoutUrl
+            totalQuantity
+            estimatedCost { totalAmount { amount currencyCode } }
+            lines(first: 250) {
+              edges { node {
+                id quantity merchandise { ... on ProductVariant { id title product { title } image { url } price { amount currencyCode } } }
+              } }
+            }
+          }
+          userErrors { field message }
+        }
+      }
+    ''';
+
+    final resp = await graphQL(mutation, variables: {'cartId': cartId, 'lines': lines});
+    if (resp.error) return ApiResponse(data: null, message: resp.message, error: true, status: resp.status);
+
+    final payload = resp.data?['cartLinesAdd'];
+    if (payload == null) return ApiResponse(data: null, message: 'Invalid response', error: true, status: 500);
+
+    final errors = payload['userErrors'] as List<dynamic>? ?? [];
+    if (errors.isNotEmpty) return ApiResponse(data: null, message: errors.first['message'] ?? 'Error', error: true, status: 400);
+
+    final cartMap = payload['cart'] as Map<String, dynamic>?;
+    if (cartMap == null) return ApiResponse(data: null, message: 'No cart object', error: true, status: 500);
+
+    final cart = CartModel.fromGraphQL(cartMap);
+    await _saveLocalCartId(cart.id);
+    return ApiResponse(data: cart, message: 'Success', error: false, status: 200);
+  }
+
+  /// Update cart lines (each item: {id: cartLineId, quantity: int})
+  Future<ApiResponse<CartModel>> updateLines({
+    required String cartId,
+    required List<Map<String, dynamic>> lines,
+  }) async {
+    const mutation = r'''
+      mutation cartLinesUpdate($cartId: ID!, $lines: [CartLineUpdateInput!]!) {
+        cartLinesUpdate(cartId: $cartId, lines: $lines) {
+          cart {
+            id
+            checkoutUrl
+            totalQuantity
+            estimatedCost { totalAmount { amount currencyCode } }
+            lines(first: 250) {
+              edges { node {
+                id quantity merchandise { ... on ProductVariant { id title product { title } image { url } price { amount currencyCode } } }
+              } }
+            }
+          }
+          userErrors { field message }
+        }
+      }
+    ''';
+
+    final resp = await graphQL(mutation, variables: {'cartId': cartId, 'lines': lines});
+    if (resp.error) return ApiResponse(data: null, message: resp.message, error: true, status: resp.status);
+
+    final payload = resp.data?['cartLinesUpdate'];
+    if (payload == null) return ApiResponse(data: null, message: 'Invalid response', error: true, status: 500);
+
+    final errors = payload['userErrors'] as List<dynamic>? ?? [];
+    if (errors.isNotEmpty) return ApiResponse(data: null, message: errors.first['message'] ?? 'Error', error: true, status: 400);
+
+    final cartMap = payload['cart'] as Map<String, dynamic>?;
+    if (cartMap == null) return ApiResponse(data: null, message: 'No cart object', error: true, status: 500);
+
+    final cart = CartModel.fromGraphQL(cartMap);
+    return ApiResponse(data: cart, message: 'Success', error: false, status: 200);
+  }
+
+  /// Remove cart lines by their cartLineIds
+  Future<ApiResponse<CartModel>> removeLines({
+    required String cartId,
+    required List<String> lineIds,
+  }) async {
+    const mutation = r'''
+      mutation cartLinesRemove($cartId: ID!, $lineIds: [ID!]!) {
+        cartLinesRemove(cartId: $cartId, lineIds: $lineIds) {
+          cart {
+            id
+            checkoutUrl
+            totalQuantity
+            estimatedCost { totalAmount { amount currencyCode } }
+            lines(first: 250) {
+              edges { node {
+                id quantity merchandise { ... on ProductVariant { id title product { title } image { url } price { amount currencyCode } } }
+              } }
+            }
+          }
+          userErrors { field message }
+        }
+      }
+    ''';
+
+    final resp = await graphQL(mutation, variables: {'cartId': cartId, 'lineIds': lineIds});
+    if (resp.error) return ApiResponse(data: null, message: resp.message, error: true, status: resp.status);
+
+    final payload = resp.data?['cartLinesRemove'];
+    if (payload == null) return ApiResponse(data: null, message: 'Invalid response', error: true, status: 500);
+
+    final errors = payload['userErrors'] as List<dynamic>? ?? [];
+    if (errors.isNotEmpty) return ApiResponse(data: null, message: errors.first['message'] ?? 'Error', error: true, status: 400);
+
+    final cartMap = payload['cart'] as Map<String, dynamic>?;
+    if (cartMap == null) return ApiResponse(data: null, message: 'No cart object', error: true, status: 500);
+
+    final cart = CartModel.fromGraphQL(cartMap);
+    if (cart.totalQuantity == 0) await clearLocalCartId();
+    return ApiResponse(data: cart, message: 'Success', error: false, status: 200);
+  }
+///////-----------searchproduct--------------///////////////
+///  /// Search products with optional cursor-based pagination.
+  /// Uses the same PaginatedProducts container so UI pagination is identical.
+  Future<ApiResponse<PaginatedProducts>> searchProducts({
+    required String query,
+    int first = 12,
+    String? after,
+  }) async {
+    const searchQuery = r'''
+      query SearchProducts($query: String!, $first: Int!, $after: String) {
+        products(first: $first, query: $query, after: $after) {
+          edges {
+            node {
+              id
+              title
+              handle
+              description
+              images(first:1) {
+                edges { node { url altText } }
+              }
+              variants(first:1) {
+                edges {
+                  node {
+                    id
+                    title
+                    sku
+                    price {
+                      amount
+                      currencyCode
+                    }
+                  }
+                }
+              }
+            }
+          }
+          pageInfo {
+            hasNextPage
+            endCursor
+          }
+        }
+      }
+    ''';
+
+    final resp = await graphQL(searchQuery, variables: {'query': query, 'first': first, if (after != null) 'after': after});
+    if (resp.error) {
+      return ApiResponse(
+        data: null,
+        message: resp.message,
+        error: true,
+        status: resp.status,
+      );
+    }
+
+    final productsData = resp.data?['products'] ?? {};
+    final extracted = (productsData['edges'] as List<dynamic>?) ?? [];
+    final products = extracted.map<ProductModel>((e) {
+      final node = e['node'] as Map<String, dynamic>;
+      return ProductModel.fromGraphQL(node);
+    }).toList();
+
+    final pageInfo = productsData['pageInfo'] as Map<String, dynamic>?;
+
+    final paginated = PaginatedProducts(
+      products: products,
+      hasNextPage: pageInfo?['hasNextPage'] as bool? ?? false,
+      endCursor: pageInfo?['endCursor'] as String?,
+    );
+
+    return ApiResponse(
+      data: paginated,
+      message: 'Success',
+      error: false,
+      status: 200,
+    );
+  }
+
+
+}
