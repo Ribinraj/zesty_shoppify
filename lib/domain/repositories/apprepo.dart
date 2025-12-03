@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zestyvibe/domain/models/cartItem_model.dart';
+import 'package:zestyvibe/domain/models/order_modelitem.dart';
 import 'package:zestyvibe/domain/models/product_detail_model.dart';
 import 'package:zestyvibe/domain/models/product_model.dart';
 import 'package:zestyvibe/domain/token_storage.dart';
@@ -57,12 +58,14 @@ class AppRepo {
 
   AppRepo._internal({required this.dio});
 
+  /// Initialize AppRepo. It reads domain/storefront token and customer token from secure storage.
   static Future<void> init({Dio? dio}) async {
     if (_instance != null) return;
 
     final tokenStorage = TokenStorage();
     final storedDomain = await tokenStorage.readDomain();
     final storedToken = await tokenStorage.readToken();
+    final storedCustomerToken = await tokenStorage.readCustomerToken();
 
     final domain = storedDomain ?? Credentials.storeDomain;
     final token = storedToken ?? Credentials.storefrontToken;
@@ -77,18 +80,22 @@ class AppRepo {
         'Content-Type': 'application/json',
         if (token.isNotEmpty && token != '<PASTE_YOUR_STOREFRONT_TOKEN_HERE>')
           'X-Shopify-Storefront-Access-Token': token,
+        // customer token set below if available
       },
       connectTimeout: const Duration(seconds: 10),
       receiveTimeout: const Duration(seconds: 15),
     );
 
     final usedDio = dio ?? Dio(options);
+
+    // apply customer token if stored
+    if (storedCustomerToken != null && storedCustomerToken.isNotEmpty) {
+      usedDio.options.headers['X-Shopify-Customer-Access-Token'] = storedCustomerToken;
+    }
+
     _instance = AppRepo._internal(dio: usedDio);
     _instance!._storeDomain = domain.isNotEmpty ? domain : null;
-    _instance!._storefrontToken =
-        (token.isNotEmpty && token != '<PASTE_YOUR_STOREFRONT_TOKEN_HERE>')
-            ? token
-            : null;
+    _instance!._storefrontToken = (token.isNotEmpty && token != '<PASTE_YOUR_STOREFRONT_TOKEN_HERE>') ? token : null;
   }
 
   bool get hasCredentials => _storeDomain != null && _storefrontToken != null;
@@ -139,42 +146,22 @@ class AppRepo {
       final data = res.data as Map<String, dynamic>;
 
       if (data['errors'] != null) {
-        final message = (data['errors'] as List).isNotEmpty
-            ? data['errors'][0]['message']
-            : 'GraphQL error';
+        final message = (data['errors'] as List).isNotEmpty ? data['errors'][0]['message'] : 'GraphQL error';
         if (_debug) debugPrint('GraphQL ERRORS: ${data['errors']}');
-        return ApiResponse(
-          data: null,
-          message: message ?? 'GraphQL error',
-          error: true,
-          status: 400,
-        );
+        return ApiResponse(data: null, message: message ?? 'GraphQL error', error: true, status: 400);
       }
 
-      return ApiResponse(
-        data: data['data'],
-        message: 'Success',
-        error: false,
-        status: 200,
-      );
+      return ApiResponse(data: data['data'], message: 'Success', error: false, status: 200);
     } on DioException catch (e) {
-      if (_debug) debugPrint('DioException: ${e.message}');
+      if (_debug) debugPrint('DioException: ${e.message} ${e.response?.statusCode} ${e.response?.data}');
       log(e.toString());
-      return ApiResponse(
-        data: null,
-        message: 'Network or server error occurred',
-        error: true,
-        status: 500,
-      );
+      final status = e.response?.statusCode ?? 500;
+      final msg = e.response?.data != null ? e.response!.data.toString() : 'Network or server error occurred';
+      return ApiResponse(data: null, message: msg, error: true, status: status);
     } catch (e, s) {
       if (_debug) debugPrint('Unexpected error: $e');
       log('$e\n$s');
-      return ApiResponse(
-        data: null,
-        message: 'Unexpected error',
-        error: true,
-        status: 500,
-      );
+      return ApiResponse(data: null, message: 'Unexpected error', error: true, status: 500);
     }
   }
 
@@ -654,6 +641,389 @@ class AppRepo {
       status: 200,
     );
   }
+    // ------------------ Customer / Auth Methods ------------------
 
+  /// Register a new customer (sign up)
+  Future<ApiResponse<Map<String, dynamic>>> registerCustomer({
+    required String firstName,
+    String? lastName,
+    required String email,
+    required String password,
+  }) async {
+    const mutation = r'''
+      mutation customerCreate($input: CustomerCreateInput!) {
+        customerCreate(input: $input) {
+          customer {
+            id
+            firstName
+            lastName
+            email
+          }
+          customerUserErrors {
+            code
+            field
+            message
+          }
+        }
+      }
+    ''';
+
+    final input = {
+      'firstName': firstName,
+      if (lastName != null) 'lastName': lastName,
+      'email': email,
+      'password': password,
+    };
+
+    final resp = await graphQL(mutation, variables: {'input': input});
+    if (resp.error) return ApiResponse(data: null, message: resp.message, error: true, status: resp.status);
+
+    final payload = resp.data?['customerCreate'];
+    if (payload == null) return ApiResponse(data: null, message: 'Invalid response', error: true, status: 500);
+
+    final errors = payload['customerUserErrors'] as List<dynamic>? ?? [];
+    if (errors.isNotEmpty) {
+      final msg = (errors.first['message'] ?? 'Customer create error').toString();
+      return ApiResponse(data: null, message: msg, error: true, status: 400);
+    }
+
+    final customer = payload['customer'] as Map<String, dynamic>?;
+    if (customer == null) return ApiResponse(data: null, message: 'No customer returned', error: true, status: 500);
+
+    return ApiResponse(data: customer, message: 'Success', error: false, status: 200);
+  }
+
+  /// Create a customer access token (login)
+  Future<ApiResponse<Map<String, dynamic>>> loginCustomer({
+    required String email,
+    required String password,
+    bool persistToken = true,
+  }) async {
+    const mutation = r'''
+      mutation customerAccessTokenCreate($input: CustomerAccessTokenCreateInput!) {
+        customerAccessTokenCreate(input: $input) {
+          customerAccessToken {
+            accessToken
+            expiresAt
+          }
+          customerUserErrors {
+            message
+            field
+            code
+          }
+        }
+      }
+    ''';
+
+    final input = {'email': email, 'password': password};
+    final resp = await graphQL(mutation, variables: {'input': input});
+    if (resp.error) return ApiResponse(data: null, message: resp.message, error: true, status: resp.status);
+
+    final payload = resp.data?['customerAccessTokenCreate'];
+    if (payload == null) return ApiResponse(data: null, message: 'Invalid response', error: true, status: 500);
+
+    final errors = payload['customerUserErrors'] as List<dynamic>? ?? [];
+    if (errors.isNotEmpty) {
+      final msg = (errors.first['message'] ?? 'Login failed').toString();
+      return ApiResponse(data: null, message: msg, error: true, status: 400);
+    }
+
+    final tokenObj = payload['customerAccessToken'] as Map<String, dynamic>?;
+    if (tokenObj == null) return ApiResponse(data: null, message: 'No token returned', error: true, status: 500);
+
+    final accessToken = tokenObj['accessToken'] as String?;
+    if (accessToken == null) return ApiResponse(data: null, message: 'No access token', error: true, status: 500);
+
+    if (persistToken) {
+      await _tokenStorage.saveCustomerToken(accessToken, expiresAt: tokenObj['expiresAt']?.toString());
+      dio.options.headers['X-Shopify-Customer-Access-Token'] = accessToken;
+    }
+
+    return ApiResponse(data: tokenObj, message: 'Success', error: false, status: 200);
+  }
+
+  /// Delete customer access token (logout)
+  Future<ApiResponse<void>> logoutCustomer({String? accessToken}) async {
+    final token = accessToken ?? await _tokenStorage.readCustomerToken();
+    if (token == null) return ApiResponse(data: null, message: 'No customer token', error: true, status: 400);
+
+    const mutation = r'''
+      mutation customerAccessTokenDelete($customerAccessToken: String!) {
+        customerAccessTokenDelete(customerAccessToken: $customerAccessToken) {
+          deletedAccessToken
+          userErrors { field message }
+        }
+      }
+    ''';
+
+    final resp = await graphQL(mutation, variables: {'customerAccessToken': token});
+    if (resp.error) return ApiResponse(data: null, message: resp.message, error: true, status: resp.status);
+
+    final payload = resp.data?['customerAccessTokenDelete'];
+    if (payload == null) return ApiResponse(data: null, message: 'Invalid response', error: true, status: 500);
+
+    final errors = payload['userErrors'] as List<dynamic>? ?? [];
+    if (errors.isNotEmpty) {
+      return ApiResponse(data: null, message: errors.first['message'] ?? 'Error', error: true, status: 400);
+    }
+
+    await _tokenStorage.deleteCustomerToken();
+    dio.options.headers.remove('X-Shopify-Customer-Access-Token');
+
+    return ApiResponse(data: null, message: 'Success', error: false, status: 200);
+  }
+
+  /// Fetch current customer profile using customerAccessToken
+  Future<ApiResponse<Map<String, dynamic>>> fetchCustomer({String? accessToken}) async {
+    final token = accessToken ?? await _tokenStorage.readCustomerToken();
+    if (token == null) return ApiResponse(data: null, message: 'No customer token', error: true, status: 400);
+
+    const query = r'''
+      query customerQuery($token: String!) {
+        customer(customerAccessToken: $token) {
+          id
+          email
+          firstName
+          lastName
+          phone
+          defaultAddress {
+            address1
+            city
+            country
+            zip
+          }
+          acceptsMarketing
+        }
+      }
+    ''';
+
+    final resp = await graphQL(query, variables: {'token': token});
+    if (resp.error) return ApiResponse(data: null, message: resp.message, error: true, status: resp.status);
+
+    final customer = resp.data?['customer'] as Map<String, dynamic>?;
+    if (customer == null) return ApiResponse(data: null, message: 'Customer not found', error: true, status: 404);
+
+    return ApiResponse(data: customer, message: 'Success', error: false, status: 200);
+  }
+
+  // --------- helper to set/clear customer token manually ---------
+  Future<void> setCustomerAccessToken(String token) async {
+    await _tokenStorage.saveCustomerToken(token);
+    dio.options.headers['X-Shopify-Customer-Access-Token'] = token;
+  }
+
+  Future<void> clearCustomerAccessToken() async {
+    await _tokenStorage.deleteCustomerToken();
+    dio.options.headers.remove('X-Shopify-Customer-Access-Token');
+  }
+/// Fetch customer orders (requires customer access token)
+Future<ApiResponse<List<OrderModel>>> fetchCustomerOrders({
+  int first = 10,
+  String? after,
+}) async {
+  final token = await _tokenStorage.readCustomerToken();
+  if (token == null) {
+    return ApiResponse(
+      data: null,
+      message: 'Not logged in',
+      error: true,
+      status: 401,
+    );
+  }
+
+const query = r'''
+  query getCustomerOrders($token: String!, $first: Int!, $after: String) {
+    customer(customerAccessToken: $token) {
+      orders(first: $first, after: $after, sortKey: PROCESSED_AT, reverse: true) {
+        edges {
+          node {
+            id
+            name
+            orderNumber
+            processedAt
+            financialStatus
+            fulfillmentStatus
+            statusUrl
+            email
+            totalPriceV2 { amount currencyCode }
+            shippingAddress { address1 city province zip country }
+            lineItems(first: 50) {
+              edges {
+                node {
+                  title
+                  quantity
+                  originalTotalPrice { amount currencyCode }
+                  variant {
+                    id
+                    title
+                    image { url }
+                    product { title }
+                  }
+                }
+              }
+            }
+          }
+        }
+        pageInfo { hasNextPage endCursor }
+      }
+    }
+  }
+''';
+
+
+  final resp = await graphQL(
+    query,
+    variables: {
+      'token': token,
+      'first': first,
+      if (after != null) 'after': after,
+    },
+  );
+
+  if (resp.error) {
+    return ApiResponse(
+      data: null,
+      message: resp.message,
+      error: true,
+      status: resp.status,
+    );
+  }
+
+  final customer = resp.data?['customer'];
+  if (customer == null) {
+    return ApiResponse(
+      data: null,
+      message: 'Customer not found or token expired',
+      error: true,
+      status: 404,
+    );
+  }
+
+  final ordersData = customer['orders'] ?? {};
+  final edges = (ordersData['edges'] as List<dynamic>?) ?? [];
+  
+  final orders = edges.map<OrderModel>((e) {
+    final node = e['node'] as Map<String, dynamic>;
+    return OrderModel.fromGraphQL(node);
+  }).toList();
+
+  return ApiResponse(
+    data: orders,
+    message: 'Success',
+    error: false,
+    status: 200,
+  );
+}
+
+/// Fetch single order details
+Future<ApiResponse<OrderModel>> fetchOrderById({
+  required String orderId,
+}) async {
+  final token = await _tokenStorage.readCustomerToken();
+  if (token == null) {
+    return ApiResponse(
+      data: null,
+      message: 'Not logged in',
+      error: true,
+      status: 401,
+    );
+  }
+
+  const query = r'''
+    query getOrder($token: String!) {
+      customer(customerAccessToken: $token) {
+        orders(first: 250) {
+          edges {
+            node {
+              id
+              name
+              orderNumber
+              processedAt
+              financialStatus
+              fulfillmentStatus
+              statusUrl
+              email
+              totalPriceV2 {
+                amount
+                currencyCode
+              }
+              shippingAddress {
+                address1
+                city
+                province
+                zip
+                country
+              }
+              lineItems(first: 50) {
+                edges {
+                  node {
+                    title
+                    variantTitle
+                    quantity
+                    originalTotalPrice {
+                      amount
+                      currencyCode
+                    }
+                    image {
+                      url
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ''';
+
+  final resp = await graphQL(query, variables: {'token': token});
+
+  if (resp.error) {
+    return ApiResponse(
+      data: null,
+      message: resp.message,
+      error: true,
+      status: resp.status,
+    );
+  }
+
+  final customer = resp.data?['customer'];
+  if (customer == null) {
+    return ApiResponse(
+      data: null,
+      message: 'Customer not found',
+      error: true,
+      status: 404,
+    );
+  }
+
+  final ordersData = customer['orders'] ?? {};
+  final edges = (ordersData['edges'] as List<dynamic>?) ?? [];
+  
+  // Find the specific order
+  final orderNode = edges.firstWhere(
+    (e) => (e['node'] as Map<String, dynamic>)['id'] == orderId,
+    orElse: () => null,
+  );
+
+  if (orderNode == null) {
+    return ApiResponse(
+      data: null,
+      message: 'Order not found',
+      error: true,
+      status: 404,
+    );
+  }
+
+  final order = OrderModel.fromGraphQL(orderNode['node'] as Map<String, dynamic>);
+
+  return ApiResponse(
+    data: order,
+    message: 'Success',
+    error: false,
+    status: 200,
+  );
+}
 
 }

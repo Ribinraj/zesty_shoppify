@@ -66,6 +66,17 @@ class BottomNavigationWidget extends StatelessWidget {
                 ),
                 label: "cart",
               ),
+                      BottomNavigationBarItem(
+                icon: Icon(
+                  Icons.category_rounded,
+                  size: ResponsiveUtils.wp(7),
+                ),
+                activeIcon: Icon(
+                  Icons.category_rounded,
+                  size: ResponsiveUtils.wp(7),
+                ),
+                label: "Orders",
+              ),
               BottomNavigationBarItem(
                 icon: Icon(
                   Icons.assignment_outlined,

@@ -4,11 +4,14 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:zestyvibe/core/colors.dart';
 import 'package:zestyvibe/core/responsiveutils.dart';
 import 'package:zestyvibe/domain/repositories/apprepo.dart';
+import 'package:zestyvibe/presentation/blocs/auth_bloc/auth_bloc.dart';
 import 'package:zestyvibe/presentation/blocs/bottom_navigation_bloc/bottom_navigation_bloc.dart';
 import 'package:zestyvibe/presentation/blocs/cart_bloc/cart_bloc.dart';
+import 'package:zestyvibe/presentation/blocs/orders_bloc/orders_bloc.dart';
 import 'package:zestyvibe/presentation/blocs/product_bloc/product_bloc.dart';
 import 'package:zestyvibe/presentation/blocs/product_detial_bloc/product_detail_bloc.dart';
-import 'package:zestyvibe/presentation/screens/screen_mainpage/screen_mainpage.dart';
+
+import 'package:zestyvibe/presentation/screens/splashscreen/splash_screen.dart';
 
 
 void main() async {
@@ -32,6 +35,8 @@ class MyApp extends StatelessWidget {
         BlocProvider(create: (context) => ProductDetailBloc(repository: AppRepo.instance)),
                 BlocProvider(create: (context) => CartBloc(repository: AppRepo.instance)),
                         BlocProvider(create: (context) => BottomNavigationBloc()),
+                         BlocProvider(create: (context) => OrdersBloc(repository: AppRepo.instance)),
+                           BlocProvider(create: (context) => AuthBloc(repository: AppRepo.instance)..add(AuthCheckRequested())),
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
@@ -49,7 +54,7 @@ class MyApp extends StatelessWidget {
           highlightColor: Colors.transparent,
           scaffoldBackgroundColor: Appcolors.kbackgroundcolor,
         ),
-        home: ScreenMainPage(),
+        home: SplashScreen(),
       ),
     );
   }
