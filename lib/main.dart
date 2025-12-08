@@ -5,8 +5,10 @@ import 'package:zestyvibe/core/colors.dart';
 import 'package:zestyvibe/core/responsiveutils.dart';
 import 'package:zestyvibe/domain/repositories/apprepo.dart';
 import 'package:zestyvibe/presentation/blocs/auth_bloc/auth_bloc.dart';
+import 'package:zestyvibe/presentation/blocs/banner_bloc/banner_bloc.dart';
 import 'package:zestyvibe/presentation/blocs/bottom_navigation_bloc/bottom_navigation_bloc.dart';
 import 'package:zestyvibe/presentation/blocs/cart_bloc/cart_bloc.dart';
+
 import 'package:zestyvibe/presentation/blocs/orders_bloc/orders_bloc.dart';
 import 'package:zestyvibe/presentation/blocs/product_bloc/product_bloc.dart';
 import 'package:zestyvibe/presentation/blocs/product_detial_bloc/product_detail_bloc.dart';
@@ -37,6 +39,8 @@ class MyApp extends StatelessWidget {
                         BlocProvider(create: (context) => BottomNavigationBloc()),
                          BlocProvider(create: (context) => OrdersBloc(repository: AppRepo.instance)),
                            BlocProvider(create: (context) => AuthBloc(repository: AppRepo.instance)..add(AuthCheckRequested())),
+                             BlocProvider(create: (context) => BannerBloc(repository: AppRepo.instance)),
+                            
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,

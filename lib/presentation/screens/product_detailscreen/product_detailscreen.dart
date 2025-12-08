@@ -5,7 +5,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_html/flutter_html.dart';
 
 import 'package:zestyvibe/core/colors.dart' show Appcolors;
-import 'package:zestyvibe/domain/models/product_detail_model.dart';
+import 'package:zestyvibe/data/models/product_detail_model.dart';
+
 
 import 'package:zestyvibe/domain/repositories/apprepo.dart';
 import 'package:zestyvibe/presentation/blocs/cart_bloc/cart_bloc.dart';

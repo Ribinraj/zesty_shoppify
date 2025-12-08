@@ -2,7 +2,8 @@ import 'dart:async';
 
 import 'package:bloc/bloc.dart';
 import 'package:meta/meta.dart';
-import 'package:zestyvibe/domain/models/product_detail_model.dart';
+import 'package:zestyvibe/data/models/product_detail_model.dart';
+
 import 'package:zestyvibe/domain/repositories/apprepo.dart';
 
 part 'product_detail_event.dart';

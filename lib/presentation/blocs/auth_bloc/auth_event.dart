@@ -24,3 +24,33 @@ class AuthRegisterRequested extends AuthEvent {
     required this.password,
   });
 }
+class AuthUpdateProfileRequested extends AuthEvent {
+  final String? firstName;
+  final String? lastName;
+  final String? phone;
+  final bool? acceptsMarketing;
+
+  AuthUpdateProfileRequested({
+    this.firstName,
+    this.lastName,
+    this.phone,
+    this.acceptsMarketing,
+  });
+}
+class AuthUpdateAddressRequested extends AuthEvent {
+  final String address1;
+  final String? address2;
+  final String? city;
+  final String? province;
+  final String? zip;
+  final String? country;
+
+  AuthUpdateAddressRequested({
+    required this.address1,
+    this.address2,
+    this.city,
+    this.province,
+    this.zip,
+    this.country,
+  });
+}

@@ -1,12 +1,16 @@
 // lib/repository/app_repo.dart
+
 import 'dart:developer';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:zestyvibe/domain/models/cartItem_model.dart';
-import 'package:zestyvibe/domain/models/order_modelitem.dart';
-import 'package:zestyvibe/domain/models/product_detail_model.dart';
-import 'package:zestyvibe/domain/models/product_model.dart';
+import 'package:zestyvibe/data/models/bannermodel.dart';
+import 'package:zestyvibe/data/models/cartItem_model.dart';
+import 'package:zestyvibe/data/models/collection_model.dart';
+
+import 'package:zestyvibe/data/models/order_modelitem.dart';
+import 'package:zestyvibe/data/models/product_detail_model.dart';
+import 'package:zestyvibe/data/models/product_model.dart';
 import 'package:zestyvibe/domain/token_storage.dart';
 
 import 'package:zestyvibe/core/urls.dart';
@@ -165,83 +169,7 @@ class AppRepo {
     }
   }
 
-  /// Fetch products with optional cursor-based pagination.
-  /// `first` - number of products to fetch (Shopify max 250 per call)
-  /// `after` - optional cursor to fetch next page
-  Future<ApiResponse<PaginatedProducts>> fetchProducts({
-    int first = 12,
-    String? after,
-  }) async {
-    const query = r'''
-      query Products($first: Int!, $after: String) {
-        products(first: $first, after: $after) {
-          edges {
-            node {
-              id
-              title
-              handle
-              description
-              images(first:1) {
-                edges { node { url altText } }
-              }
-              variants(first:1) {
-                edges {
-                  node {
-                    id
-                    title
-                    sku
-                    price {
-                      amount
-                      currencyCode
-                    }
-                  }
-                }
-              }
-            }
-          }
-          pageInfo {
-            hasNextPage
-            endCursor
-          }
-        }
-      }
-    ''';
 
-    final resp = await graphQL(query, variables: {'first': first, if (after != null) 'after': after});
-    if (resp.error) {
-      return ApiResponse(
-        data: null,
-        message: resp.message,
-        error: true,
-        status: resp.status,
-      );
-    }
-
-    final productsData = resp.data?['products'] ?? {};
-    final extracted = (productsData['edges'] as List<dynamic>?) ?? [];
-    final products = extracted.map<ProductModel>((e) {
-      final node = e['node'] as Map<String, dynamic>;
-      return ProductModel.fromGraphQL(node);
-    }).toList();
-
-    final pageInfo = productsData['pageInfo'] as Map<String, dynamic>?;
-
-    final paginated = PaginatedProducts(
-      products: products,
-      hasNextPage: pageInfo?['hasNextPage'] as bool? ?? false,
-      endCursor: pageInfo?['endCursor'] as String?,
-    );
-
-    return ApiResponse(
-      data: paginated,
-      message: 'Success',
-      error: false,
-      status: 200,
-    );
-  }
-
-  /// Fetch single product by handle
-  /// NOTE: metafields removed to avoid "missing required arguments" errors.
   Future<ApiResponse<ProductDetailModel>> fetchProductByHandle({
     required String handle,
   }) async {
@@ -914,6 +842,126 @@ const query = r'''
     status: 200,
   );
 }
+// In AppRepo class
+
+/// Update current logged-in customer's profile
+Future<ApiResponse<Map<String, dynamic>>> updateCustomerProfile({
+  String? firstName,
+  String? lastName,
+  String? phone,
+  bool? acceptsMarketing,
+}) async {
+  // Need customer token
+  final token = await _tokenStorage.readCustomerToken();
+  if (token == null) {
+    return ApiResponse(
+      data: null,
+      message: 'No customer token',
+      error: true,
+      status: 401,
+    );
+  }
+
+  // Build input object only with non-null fields
+  final customerInput = <String, dynamic>{};
+  if (firstName != null) customerInput['firstName'] = firstName;
+  if (lastName != null) customerInput['lastName'] = lastName;
+  if (phone != null) customerInput['phone'] = phone;
+  if (acceptsMarketing != null) {
+    customerInput['acceptsMarketing'] = acceptsMarketing;
+  }
+
+  if (customerInput.isEmpty) {
+    return ApiResponse(
+      data: null,
+      message: 'Nothing to update',
+      error: true,
+      status: 400,
+    );
+  }
+
+  const mutation = r'''
+    mutation customerUpdate($customerAccessToken: String!, $customer: CustomerUpdateInput!) {
+      customerUpdate(customerAccessToken: $customerAccessToken, customer: $customer) {
+        customer {
+          id
+          email
+          firstName
+          lastName
+          phone
+          defaultAddress {
+            address1
+            city
+            country
+            zip
+          }
+          acceptsMarketing
+        }
+        customerUserErrors {
+          code
+          field
+          message
+        }
+      }
+    }
+  ''';
+
+  final resp = await graphQL(
+    mutation,
+    variables: {
+      'customerAccessToken': token,
+      'customer': customerInput,
+    },
+  );
+
+  if (resp.error) {
+    return ApiResponse(
+      data: null,
+      message: resp.message,
+      error: true,
+      status: resp.status,
+    );
+  }
+
+  final payload = resp.data?['customerUpdate'];
+  if (payload == null) {
+    return ApiResponse(
+      data: null,
+      message: 'Invalid response',
+      error: true,
+      status: 500,
+    );
+  }
+
+  final errors = payload['customerUserErrors'] as List<dynamic>? ?? [];
+  if (errors.isNotEmpty) {
+    final msg = (errors.first['message'] ?? 'Update failed').toString();
+    return ApiResponse(
+      data: null,
+      message: msg,
+      error: true,
+      status: 400,
+    );
+  }
+
+  final customer = payload['customer'] as Map<String, dynamic>?;
+  if (customer == null) {
+    return ApiResponse(
+      data: null,
+      message: 'No customer returned',
+      error: true,
+      status: 500,
+    );
+  }
+
+  // same style as fetchCustomer / registerCustomer etc.
+  return ApiResponse(
+    data: customer,
+    message: 'Success',
+    error: false,
+    status: 200,
+  );
+}
 
 /// Fetch single order details
 Future<ApiResponse<OrderModel>> fetchOrderById({
@@ -1020,6 +1068,630 @@ Future<ApiResponse<OrderModel>> fetchOrderById({
 
   return ApiResponse(
     data: order,
+    message: 'Success',
+    error: false,
+    status: 200,
+  );
+}
+/// Fetch collections with pagination
+/// Fetch collections with pagination - IMPROVED VERSION
+Future<ApiResponse<List<CollectionModel>>> fetchCollections({
+  int first = 10,
+  String? after,
+}) async {
+  const query = r'''
+    query Collections($first: Int!, $after: String) {
+      collections(first: $first, after: $after) {
+        edges {
+          node {
+            id
+            title
+            handle
+            description
+            image {
+              url
+              altText
+            }
+            products(first: 250) {
+              edges {
+                node {
+                  id
+                }
+              }
+            }
+          }
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+      }
+    }
+  ''';
+
+  final resp = await graphQL(query, variables: {
+    'first': first,
+    if (after != null) 'after': after,
+  });
+
+  if (resp.error) {
+    return ApiResponse(
+      data: null,
+      message: resp.message,
+      error: true,
+      status: resp.status,
+    );
+  }
+
+  final collectionsData = resp.data?['collections'] ?? {};
+  final extracted = (collectionsData['edges'] as List<dynamic>?) ?? [];
+  
+  final collections = extracted.map<CollectionModel>((e) {
+    final node = e['node'] as Map<String, dynamic>;
+    return CollectionModel.fromGraphQL(node);
+  }).toList();
+
+  return ApiResponse(
+    data: collections,
+    message: 'Success',
+    error: false,
+    status: 200,
+  );
+}
+
+/// Fetch products by collection with filters and sorting
+Future<ApiResponse<PaginatedProducts>> fetchProductsByCollection({
+  required String collectionHandle,
+  int first = 12,
+  String? after,
+  ProductSortKey sortKey = ProductSortKey.relevance,
+  ProductFilter? filters,
+}) async {
+  const query = r'''
+    query CollectionProducts($handle: String!, $first: Int!, $after: String, $sortKey: ProductCollectionSortKeys, $filters: [ProductFilter!]) {
+      collection(handle: $handle) {
+        products(first: $first, after: $after, sortKey: $sortKey, filters: $filters) {
+          edges {
+            node {
+              id
+              title
+              handle
+              description
+              vendor
+              productType
+              tags
+              availableForSale
+              images(first: 1) {
+                edges {
+                  node {
+                    url
+                    altText
+                  }
+                }
+              }
+              priceRange {
+                minVariantPrice {
+                  amount
+                  currencyCode
+                }
+                maxVariantPrice {
+                  amount
+                  currencyCode
+                }
+              }
+              variants(first: 1) {
+                edges {
+                  node {
+                    id
+                    title
+                    price {
+                      amount
+                      currencyCode
+                    }
+                    compareAtPrice {
+                      amount
+                      currencyCode
+                    }
+                  }
+                }
+              }
+            }
+          }
+          pageInfo {
+            hasNextPage
+            endCursor
+          }
+        }
+      }
+    }
+  ''';
+
+  final variables = <String, dynamic>{
+    'handle': collectionHandle,
+    'first': first,
+    if (after != null) 'after': after,
+    'sortKey': sortKey.value,
+    if (filters != null) 'filters': [filters.toJson()],
+  };
+
+  final resp = await graphQL(query, variables: variables);
+
+  if (resp.error) {
+    return ApiResponse(
+      data: null,
+      message: resp.message,
+      error: true,
+      status: resp.status,
+    );
+  }
+
+  final collection = resp.data?['collection'];
+  if (collection == null) {
+    return ApiResponse(
+      data: null,
+      message: 'Collection not found',
+      error: true,
+      status: 404,
+    );
+  }
+
+  final productsData = collection['products'] ?? {};
+  final extracted = (productsData['edges'] as List<dynamic>?) ?? [];
+  
+  final products = extracted.map<ProductModel>((e) {
+    final node = e['node'] as Map<String, dynamic>;
+    return ProductModel.fromGraphQL(node);
+  }).toList();
+
+  final pageInfo = productsData['pageInfo'] as Map<String, dynamic>?;
+
+  final paginated = PaginatedProducts(
+    products: products,
+    hasNextPage: pageInfo?['hasNextPage'] as bool? ?? false,
+    endCursor: pageInfo?['endCursor'] as String?,
+  );
+
+  return ApiResponse(
+    data: paginated,
+    message: 'Success',
+    error: false,
+    status: 200,
+  );
+}
+
+/// Updated fetchProducts with sorting support
+Future<ApiResponse<PaginatedProducts>> fetchProducts({
+  int first = 12,
+  String? after,
+  ProductSortKey sortKey = ProductSortKey.relevance,
+  ProductFilter? filters,
+}) async {
+  const query = r'''
+    query Products($first: Int!, $after: String, $sortKey: ProductSortKeys, $query: String) {
+      products(first: $first, after: $after, sortKey: $sortKey, query: $query) {
+        edges {
+          node {
+            id
+            title
+            handle
+            description
+            vendor
+            productType
+            tags
+            availableForSale
+            images(first: 1) {
+              edges {
+                node {
+                  url
+                  altText
+                }
+              }
+            }
+            priceRange {
+              minVariantPrice {
+                amount
+                currencyCode
+              }
+              maxVariantPrice {
+                amount
+                currencyCode
+              }
+            }
+            variants(first: 1) {
+              edges {
+                node {
+                  id
+                  title
+                  price {
+                    amount
+                    currencyCode
+                  }
+                  compareAtPrice {
+                    amount
+                    currencyCode
+                  }
+                }
+              }
+            }
+          }
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+      }
+    }
+  ''';
+
+  // Build query string from filters
+  String? queryString;
+  if (filters != null) {
+    final parts = <String>[];
+    if (filters.available != null) {
+      parts.add('available_for_sale:${filters.available}');
+    }
+    if (filters.productType != null) {
+      parts.add('product_type:"${filters.productType}"');
+    }
+    if (filters.vendor != null) {
+      parts.add('vendor:"${filters.vendor}"');
+    }
+    if (filters.price != null) {
+      parts.add('variants.price:>=${filters.price!.min}');
+      parts.add('variants.price:<=${filters.price!.max}');
+    }
+    if (filters.tags != null && filters.tags!.isNotEmpty) {
+      for (final tag in filters.tags!) {
+        parts.add('tag:"$tag"');
+      }
+    }
+    if (parts.isNotEmpty) {
+      queryString = parts.join(' AND ');
+    }
+  }
+
+  final resp = await graphQL(query, variables: {
+    'first': first,
+    if (after != null) 'after': after,
+    'sortKey': sortKey.value,
+    if (queryString != null) 'query': queryString,
+  });
+
+  if (resp.error || resp.data == null) {
+    return ApiResponse(
+      data: null,
+      message: resp.message,
+      error: true,
+      status: resp.status,
+    );
+  }
+
+  final productsData = resp.data?['products'] ?? {};
+  final extracted = (productsData['edges'] as List<dynamic>?) ?? [];
+  
+  final products = extracted.map<ProductModel>((e) {
+    final node = e['node'] as Map<String, dynamic>;
+    return ProductModel.fromGraphQL(node);
+  }).toList();
+
+  final pageInfo = productsData['pageInfo'] as Map<String, dynamic>?;
+
+  final paginated = PaginatedProducts(
+    products: products,
+    hasNextPage: pageInfo?['hasNextPage'] as bool? ?? false,
+    endCursor: pageInfo?['endCursor'] as String?,
+  );
+
+  return ApiResponse(
+    data: paginated,
+    message: 'Success',
+    error: false,
+    status: 200,
+  );
+}
+
+
+Future<ApiResponse<List<BannerModel>>> fetchBannersFromCollections() async {
+  const query = r'''
+    query {
+      collections(first: 5, query: "featured:true") {
+        edges {
+          node {
+            id
+            title
+            handle
+            description
+            image {
+              url
+              altText
+            }
+          }
+        }
+      }
+    }
+  ''';
+
+  if (_debug) debugPrint('--- FETCHING BANNERS FROM COLLECTIONS ---');
+  
+  final resp = await graphQL(query);
+
+  if (resp.error) {
+    if (_debug) debugPrint('❌ fetchBannersFromCollections error: ${resp.message}');
+    return _getMockBanners();
+  }
+
+  try {
+    final edges = resp.data?['collections']?['edges'] as List<dynamic>?;
+    
+    if (edges == null || edges.isEmpty) {
+      if (_debug) debugPrint('⚠️ No featured collections found');
+      return _getMockBanners();
+    }
+
+    final banners = <BannerModel>[];
+    
+    for (var i = 0; i < edges.length; i++) {
+      final node = edges[i]['node'] as Map<String, dynamic>;
+      final image = node['image'] as Map<String, dynamic>?;
+      
+      if (image != null && image['url'] != null) {
+        banners.add(BannerModel(
+          id: node['id']?.toString() ?? 'banner_$i',
+          imageUrl: image['url']?.toString() ?? '',
+          title: node['title']?.toString() ?? 'Collection',
+          subtitle: node['description']?.toString() ?? 'Explore our products',
+          actionText: 'Shop Collection',
+          actionHandle: node['handle']?.toString(),
+          order: i,
+        ));
+      }
+    }
+
+    if (_debug) debugPrint('✅ Created ${banners.length} banners from collections');
+
+    return ApiResponse(
+      data: banners,
+      message: 'Success',
+      error: false,
+      status: 200,
+    );
+  } catch (e, s) {
+    if (_debug) {
+      debugPrint('❌ Failed to parse collection banners: $e');
+      debugPrint('Stack trace: $s');
+    }
+    return _getMockBanners();
+  }
+}
+
+// Helper method for mock banners (same as before)
+ApiResponse<List<BannerModel>> _getMockBanners() {
+  if (_debug) debugPrint('🎨 Using mock banners for testing');
+  
+  final mockBanners = [
+    BannerModel(
+      id: 'banner_1',
+      imageUrl: 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=800&q=80',
+      title: 'Fresh Organic Products',
+      subtitle: 'Get 20% off on your first order',
+      actionText: 'Shop Now',
+      actionHandle: null,
+      order: 1,
+    ),
+    BannerModel(
+      id: 'banner_2',
+      imageUrl: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=800&q=80',
+      title: 'Premium Quality',
+      subtitle: 'Sourced directly from farms',
+      actionText: 'Explore',
+      actionHandle: null,
+      order: 2,
+    ),
+    BannerModel(
+      id: 'banner_3',
+      imageUrl: 'https://images.unsplash.com/photo-1610832958506-aa56368176cf?w=800&q=80',
+      title: 'Special Deals',
+      subtitle: 'Limited time offers on selected items',
+      actionText: 'View Deals',
+      actionHandle: null,
+      order: 3,
+    ),
+  ];
+
+  return ApiResponse(
+    data: mockBanners,
+    message: 'Using mock banners',
+    error: false,
+    status: 200,
+  );
+}
+/// Create a new address for the logged-in customer
+Future<ApiResponse<Map<String, dynamic>>> createCustomerAddress({
+  required String address1,
+  String? address2,
+  String? city,
+  String? province,
+  String? zip,
+  String? country,
+}) async {
+  final token = await _tokenStorage.readCustomerToken();
+  if (token == null) {
+    return ApiResponse(
+      data: null,
+      message: 'Not logged in',
+      error: true,
+      status: 401,
+    );
+  }
+
+  const mutation = r'''
+    mutation customerAddressCreate($customerAccessToken: String!, $address: MailingAddressInput!) {
+      customerAddressCreate(customerAccessToken: $customerAccessToken, address: $address) {
+        customerAddress {
+          id
+          address1
+          city
+          country
+          zip
+        }
+        customerUserErrors {
+          code
+          field
+          message
+        }
+      }
+    }
+  ''';
+
+  final addressInput = <String, dynamic>{
+    'address1': address1,
+    if (address2 != null && address2.isNotEmpty) 'address2': address2,
+    if (city != null && city.isNotEmpty) 'city': city,
+    if (province != null && province.isNotEmpty) 'province': province,
+    if (zip != null && zip.isNotEmpty) 'zip': zip,
+    if (country != null && country.isNotEmpty) 'country': country,
+  };
+
+  final resp = await graphQL(
+    mutation,
+    variables: {
+      'customerAccessToken': token,
+      'address': addressInput,
+    },
+  );
+
+  if (resp.error) {
+    return ApiResponse(
+      data: null,
+      message: resp.message,
+      error: true,
+      status: resp.status,
+    );
+  }
+
+  final payload = resp.data?['customerAddressCreate'];
+  if (payload == null) {
+    return ApiResponse(
+      data: null,
+      message: 'Invalid response',
+      error: true,
+      status: 500,
+    );
+  }
+
+  final errors = payload['customerUserErrors'] as List<dynamic>? ?? [];
+  if (errors.isNotEmpty) {
+    final msg = (errors.first['message'] ?? 'Address create failed').toString();
+    return ApiResponse(
+      data: null,
+      message: msg,
+      error: true,
+      status: 400,
+    );
+  }
+
+  final address = payload['customerAddress'] as Map<String, dynamic>?;
+  if (address == null) {
+    return ApiResponse(
+      data: null,
+      message: 'No address returned',
+      error: true,
+      status: 500,
+    );
+  }
+
+  return ApiResponse(
+    data: address,
+    message: 'Success',
+    error: false,
+    status: 200,
+  );
+}
+/// Set an address as the customer's default address
+Future<ApiResponse<Map<String, dynamic>>> setDefaultCustomerAddress({
+  required String addressId,
+}) async {
+  final token = await _tokenStorage.readCustomerToken();
+  if (token == null) {
+    return ApiResponse(
+      data: null,
+      message: 'Not logged in',
+      error: true,
+      status: 401,
+    );
+  }
+
+  const mutation = r'''
+    mutation customerDefaultAddressUpdate($customerAccessToken: String!, $addressId: ID!) {
+      customerDefaultAddressUpdate(customerAccessToken: $customerAccessToken, addressId: $addressId) {
+        customer {
+          id
+          defaultAddress {
+            address1
+            city
+            country
+            zip
+          }
+        }
+        customerUserErrors {
+          code
+          field
+          message
+        }
+      }
+    }
+  ''';
+
+  final resp = await graphQL(
+    mutation,
+    variables: {
+      'customerAccessToken': token,
+      'addressId': addressId,
+    },
+  );
+
+  if (resp.error) {
+    return ApiResponse(
+      data: null,
+      message: resp.message,
+      error: true,
+      status: resp.status,
+    );
+  }
+
+  final payload = resp.data?['customerDefaultAddressUpdate'];
+  if (payload == null) {
+    return ApiResponse(
+      data: null,
+      message: 'Invalid response',
+      error: true,
+      status: 500,
+    );
+  }
+
+  final errors = payload['customerUserErrors'] as List<dynamic>? ?? [];
+  if (errors.isNotEmpty) {
+    final msg = (errors.first['message'] ?? 'Set default address failed').toString();
+    return ApiResponse(
+      data: null,
+      message: msg,
+      error: true,
+      status: 400,
+    );
+  }
+
+  final customer = payload['customer'] as Map<String, dynamic>?;
+  if (customer == null) {
+    return ApiResponse(
+      data: null,
+      message: 'No customer returned',
+      error: true,
+      status: 500,
+    );
+  }
+
+  return ApiResponse(
+    data: customer,
     message: 'Success',
     error: false,
     status: 200,

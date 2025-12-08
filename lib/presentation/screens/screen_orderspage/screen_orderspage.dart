@@ -3,7 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
 import 'package:zestyvibe/core/colors.dart';
-import 'package:zestyvibe/domain/models/order_modelitem.dart';
+import 'package:zestyvibe/data/models/order_modelitem.dart';
+
 
 import 'package:zestyvibe/presentation/blocs/orders_bloc/orders_bloc.dart';
 import 'package:zestyvibe/presentation/screens/screen_orders_detailspage/screen_orders_detailspage.dart';

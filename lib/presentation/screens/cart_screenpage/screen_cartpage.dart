@@ -145,7 +145,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:zestyvibe/core/colors.dart' show Appcolors;
-import 'package:zestyvibe/domain/models/cartItem_model.dart';
+import 'package:zestyvibe/data/models/cartItem_model.dart';
+
 import 'package:zestyvibe/presentation/blocs/cart_bloc/cart_bloc.dart';
 import 'package:zestyvibe/presentation/screens/screen_checkout/screen_checkout.dart';
 

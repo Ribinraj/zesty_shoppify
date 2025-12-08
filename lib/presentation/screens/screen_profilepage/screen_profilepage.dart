@@ -2,8 +2,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:zestyvibe/core/colors.dart';
-import 'package:zestyvibe/domain/models/customer_model.dart';
+import 'package:zestyvibe/data/models/customer_model.dart';
 import 'package:zestyvibe/presentation/blocs/auth_bloc/auth_bloc.dart';
+import 'package:zestyvibe/presentation/screens/edit_adress_screen/edit_adressscreen.dart';
+import 'package:zestyvibe/presentation/screens/screen_editprofile/screen_editprofile.dart';
 import 'package:zestyvibe/presentation/screens/screen_loginpage/login_screen.dart';
 
 
@@ -26,19 +28,28 @@ class ProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('My Account'),
-        backgroundColor: Appcolors.kprimarycolor,
-        actions: [
-          IconButton(
-            onPressed: () {
-              // optional: refresh profile
-              context.read<AuthBloc>().add(AuthCheckRequested());
-            },
-            icon: const Icon(Icons.refresh),
-          ),
-        ],
-      ),
+appBar: AppBar(
+  title: const Text('My Account'),
+  backgroundColor: Appcolors.kprimarycolor,
+  actions: [
+    IconButton(
+      onPressed: () {
+        context.read<AuthBloc>().add(AuthCheckRequested());
+      },
+      icon: const Icon(Icons.refresh),
+    ),
+    IconButton(
+      onPressed: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const EditProfileScreen()),
+        );
+      },
+      icon: const Icon(Icons.edit),
+      tooltip: 'Edit profile',
+    ),
+  ],
+),
+
       body: BlocConsumer<AuthBloc, AuthState>(
         listener: (context, state) {
           if (state is AuthUnauthenticated) {
@@ -117,21 +128,43 @@ class ProfileScreen extends StatelessWidget {
                             _buildInfoRow('Phone', customer.phone),
                             _buildInfoRow('Marketing', customer.acceptsMarketing == true ? 'Yes' : 'No'),
                             const Divider(),
-                            Text('Default address', style: const TextStyle(fontWeight: FontWeight.w600)),
-                            const SizedBox(height: 8),
-                            if (customer.defaultAddress != null)
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(customer.defaultAddress?['address1'] ?? '-', style: const TextStyle(color: Colors.black87)),
-                                  const SizedBox(height: 4),
-                                  Text('${customer.defaultAddress?['city'] ?? ''} ${customer.defaultAddress?['zip'] ?? ''}'),
-                                  const SizedBox(height: 4),
-                                  Text(customer.defaultAddress?['country'] ?? ''),
-                                ],
-                              )
-                            else
-                              const Text('No default address set'),
+                         Text('Default address', style: const TextStyle(fontWeight: FontWeight.w600)),
+const SizedBox(height: 8),
+if (customer.defaultAddress != null)
+  Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        customer.defaultAddress?['address1'] ?? '-',
+        style: const TextStyle(color: Colors.black87),
+      ),
+      const SizedBox(height: 4),
+      Text('${customer.defaultAddress?['city'] ?? ''} ${customer.defaultAddress?['zip'] ?? ''}'),
+      const SizedBox(height: 4),
+      Text(customer.defaultAddress?['country'] ?? ''),
+    ],
+  )
+else
+  const Text('No default address set'),
+
+const SizedBox(height: 8),
+
+// ⬇️ New button (Add / Edit address)
+Align(
+  alignment: Alignment.centerRight,
+  child: TextButton.icon(
+    onPressed: () {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const EditAddressScreen()),
+      );
+    },
+    icon: const Icon(Icons.edit_location_alt),
+    label: Text(
+      customer.defaultAddress == null ? 'Add address' : 'Edit address',
+    ),
+  ),
+),
+
                           ],
                         ),
                       ),

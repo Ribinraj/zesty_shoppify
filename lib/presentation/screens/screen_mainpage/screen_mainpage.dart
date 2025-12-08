@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:zestyvibe/presentation/blocs/bottom_navigation_bloc/bottom_navigation_bloc.dart';
 import 'package:zestyvibe/presentation/screens/cart_screenpage/screen_cartpage.dart';
+import 'package:zestyvibe/presentation/screens/screen_homepage/screen_homepage.dart';
+
 import 'package:zestyvibe/presentation/screens/screen_mainpage/customnavbar.dart';
 import 'package:zestyvibe/presentation/screens/screen_orderspage/screen_orderspage.dart';
-import 'package:zestyvibe/presentation/screens/screen_productlists/screens_product.dart';
+
 import 'package:zestyvibe/presentation/screens/screen_profilepage/screen_profilepage.dart';
 
 
@@ -17,8 +19,7 @@ class ScreenMainPage extends StatefulWidget {
 }
 
 class _ScreenMainPageState extends State<ScreenMainPage> {
-  final List<Widget> _pages = [
-ProductListScreen(),
+  final List<Widget> _pages = [ShopifyHomePage(),
 CartScreen(),
 OrdersScreen(),
 ProfileScreen()
