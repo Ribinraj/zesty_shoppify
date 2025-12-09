@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:zestyvibe/presentation/blocs/bottom_navigation_bloc/bottom_navigation_bloc.dart';
+import 'package:zestyvibe/presentation/screens/screen_mainpage/screen_mainpage.dart';
 
 
 class CustomNavigation {
@@ -128,27 +131,27 @@ class CustomNavigation {
 //     NavigateToPageEvent(pageIndex: pageIndex),
 //   );
 // }
-// void navigateToMainPage(BuildContext context, int pageIndex) {
-//   Navigator.of(context).pushReplacement(
-//     PageRouteBuilder(
-//       pageBuilder: (context, animation, secondaryAnimation) => ScreenMainPage(),
-//       transitionsBuilder: (context, animation, secondaryAnimation, child) {
-//         return FadeTransition(
-//           opacity: animation,
-//           child: child,
-//         );
-//       },
-//     ),
-//   );
+void navigateToMainPage(BuildContext context, int pageIndex) {
+  Navigator.of(context).pushReplacement(
+    PageRouteBuilder(
+      pageBuilder: (context, animation, secondaryAnimation) => ScreenMainPage(),
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        return FadeTransition(
+          opacity: animation,
+          child: child,
+        );
+      },
+    ),
+  );
 
-//   // Delay updating BLoC to ensure smooth transition
-//   Future.delayed(const Duration(milliseconds: 100), () {
-//     // ignore: use_build_context_synchronously
-//     BlocProvider.of<BottomNavigationBloc>(context).add(
-//       NavigateToPageEvent(pageIndex: pageIndex),
-//     );
-//   });
-// }
+  // Delay updating BLoC to ensure smooth transition
+  Future.delayed(const Duration(milliseconds: 100), () {
+    // ignore: use_build_context_synchronously
+    BlocProvider.of<BottomNavigationBloc>(context).add(
+      NavigateToPageEvent(pageIndex: pageIndex),
+    );
+  });
+}
 // ///////////////////////
 // void navigateToCartPageAfterLogin(BuildContext context) {
 //   Navigator.of(context).pushAndRemoveUntil(

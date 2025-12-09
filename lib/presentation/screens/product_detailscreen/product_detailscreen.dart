@@ -256,15 +256,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       margin: EdgeInsets.symmetric(horizontal: ResponsiveUtils.wp(4)),
       padding: EdgeInsets.all(ResponsiveUtils.wp(4)),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            Appcolors.kprimarycolor.withOpacity(0.1),
-            Appcolors.kbackgroundcolor,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(ResponsiveUtils.wp(3)),
+ color: Appcolors.kwhitecolor,        borderRadius: BorderRadius.circular(ResponsiveUtils.wp(3)),
         border: Border.all(
           color: Appcolors.kprimarycolor.withOpacity(0.2),
           width: 1,

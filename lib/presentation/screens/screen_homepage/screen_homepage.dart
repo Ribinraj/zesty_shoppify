@@ -688,6 +688,7 @@ import 'package:zestyvibe/core/responsiveutils.dart';
 
 import 'package:zestyvibe/data/models/product_model.dart';
 import 'package:zestyvibe/data/models/collection_model.dart';
+import 'package:zestyvibe/presentation/blocs/auth_bloc/auth_bloc.dart';
 
 import 'package:zestyvibe/presentation/blocs/product_bloc/product_bloc.dart';
 import 'package:zestyvibe/presentation/blocs/banner_bloc/banner_bloc.dart';
@@ -698,6 +699,8 @@ import 'package:zestyvibe/presentation/screens/screen_Homepage/widgets/collectio
 import 'package:zestyvibe/presentation/screens/screen_Homepage/widgets/filtersheet_widget.dart';
 import 'package:zestyvibe/presentation/screens/screen_Homepage/widgets/home_shimmer.dart';
 import 'package:zestyvibe/presentation/screens/screen_Homepage/widgets/sortsheet_widget.dart';
+import 'package:zestyvibe/presentation/screens/screen_homepage/widgets/screen_logloutfuncton.dart';
+import 'package:zestyvibe/presentation/screens/screen_loginpage/login_screen.dart';
 
 
 
@@ -1221,12 +1224,11 @@ appBar: AppBar(
   centerTitle: false,
   surfaceTintColor: Appcolors.kwhitecolor,
 
-  // ✅ LEFT SIDE LOGO
   leading: Padding(
     padding: EdgeInsets.only(left: ResponsiveUtils.wp(3)),
     child: Center(
       child: Image.asset(
-      Appconstants.applogo,
+        Appconstants.applogo,
         height: ResponsiveUtils.hp(6),
         fit: BoxFit.contain,
       ),
@@ -1244,50 +1246,107 @@ appBar: AppBar(
   ),
 
   actions: [
-    // ✅ LOGIN BUTTON (DESIGN CONTAINER)
-    Padding(
-      padding: EdgeInsets.only(
-        right: ResponsiveUtils.wp(3),
-        top: ResponsiveUtils.hp(0.8),
-        bottom: ResponsiveUtils.hp(0.8),
-      ),
-      child: InkWell(
-        onTap: () {
-          // ✅ TODO: Navigate to Login Screen
-        },
-        borderRadius: BorderRadiusStyles.kradius5(),
-        child: Container(
-          padding: EdgeInsets.symmetric(
-            horizontal: ResponsiveUtils.wp(4),
-            vertical: ResponsiveUtils.hp(0.9),
-          ),
-          decoration: BoxDecoration(
-            color: Appcolors.kprimarycolor,
-            borderRadius: BorderRadiusStyles.kradius5(),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                Icons.login,
-                size: ResponsiveUtils.sp(3),
-                color: Appcolors.kwhitecolor,
-              ),
-              ResponsiveSizedBox.width5,
-              Text(
-                'Login',
-                style: TextStyle(
-                  fontSize: ResponsiveUtils.sp(2.6),
-                  fontWeight: FontWeight.w600,
-                  color: Appcolors.kwhitecolor,
+    BlocBuilder<AuthBloc, AuthState>(
+      builder: (context, state) {
+        // -------------------------------------------
+        // USER LOGGED IN → SHOW LOGOUT BUTTON
+        // -------------------------------------------
+        if (state is AuthAuthenticated) {
+          return Padding(
+            padding: EdgeInsets.only(
+              right: ResponsiveUtils.wp(3),
+              top: ResponsiveUtils.hp(0.8),
+              bottom: ResponsiveUtils.hp(0.8),
+            ),
+            child: InkWell(
+              onTap: () => showLogoutDialog(context),
+              borderRadius: BorderRadiusStyles.kradius5(),
+              child: Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: ResponsiveUtils.wp(4),
+                  vertical: ResponsiveUtils.hp(0.9),
+                ),
+                decoration: BoxDecoration(
+                  color: Appcolors.kprimarycolor.withOpacity(0.1),
+                  borderRadius: BorderRadiusStyles.kradius5(),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.logout,
+                      size: ResponsiveUtils.sp(3),
+                      color: Appcolors.kprimarycolor,
+                    ),
+                    ResponsiveSizedBox.width5,
+                    Text(
+                      'Logout',
+                      style: TextStyle(
+                        fontSize: ResponsiveUtils.sp(2.6),
+                        fontWeight: FontWeight.w600,
+                        color: Appcolors.kprimarycolor,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
+            ),
+          );
+        }
+
+        // -------------------------------------------
+        // USER NOT LOGGED IN → SHOW LOGIN BUTTON
+        // -------------------------------------------
+        return Padding(
+          padding: EdgeInsets.only(
+            right: ResponsiveUtils.wp(3),
+            top: ResponsiveUtils.hp(0.8),
+            bottom: ResponsiveUtils.hp(0.8),
           ),
-        ),
-      ),
+          child: InkWell(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+              );
+            },
+            borderRadius: BorderRadiusStyles.kradius5(),
+            child: Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: ResponsiveUtils.wp(4),
+                vertical: ResponsiveUtils.hp(0.9),
+              ),
+              decoration: BoxDecoration(
+                color: Appcolors.kprimarycolor,
+                borderRadius: BorderRadiusStyles.kradius5(),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.login,
+                    size: ResponsiveUtils.sp(3),
+                    color: Appcolors.kwhitecolor,
+                  ),
+                  ResponsiveSizedBox.width5,
+                  Text(
+                    'Login',
+                    style: TextStyle(
+                      fontSize: ResponsiveUtils.sp(2.6),
+                      fontWeight: FontWeight.w600,
+                      color: Appcolors.kwhitecolor,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     ),
   ],
 ),
+
+
+
 
       body: MultiBlocListener(
         listeners: [

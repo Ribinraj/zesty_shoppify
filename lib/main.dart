@@ -15,7 +15,6 @@ import 'package:zestyvibe/presentation/blocs/product_detial_bloc/product_detail_
 
 import 'package:zestyvibe/presentation/screens/splashscreen/splash_screen.dart';
 
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AppRepo.init();
@@ -34,13 +33,23 @@ class MyApp extends StatelessWidget {
         BlocProvider(
           create: (context) => ProductBloc(repository: AppRepo.instance),
         ),
-        BlocProvider(create: (context) => ProductDetailBloc(repository: AppRepo.instance)),
-                BlocProvider(create: (context) => CartBloc(repository: AppRepo.instance)),
-                        BlocProvider(create: (context) => BottomNavigationBloc()),
-                         BlocProvider(create: (context) => OrdersBloc(repository: AppRepo.instance)),
-                           BlocProvider(create: (context) => AuthBloc(repository: AppRepo.instance)..add(AuthCheckRequested())),
-                             BlocProvider(create: (context) => BannerBloc(repository: AppRepo.instance)),
-                            
+        BlocProvider(
+          create: (context) => ProductDetailBloc(repository: AppRepo.instance),
+        ),
+        BlocProvider(
+          create: (context) => CartBloc(repository: AppRepo.instance),
+        ),
+        BlocProvider(create: (context) => BottomNavigationBloc()),
+        BlocProvider(
+          create: (context) => OrdersBloc(repository: AppRepo.instance),
+        ),
+        BlocProvider(
+          create: (context) =>
+              AuthBloc(repository: AppRepo.instance)..add(AuthCheckRequested()),
+        ),
+        BlocProvider(
+          create: (context) => BannerBloc(repository: AppRepo.instance),
+        ),
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,

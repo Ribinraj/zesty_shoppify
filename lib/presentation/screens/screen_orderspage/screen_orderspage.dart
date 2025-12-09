@@ -5,10 +5,9 @@ import 'package:intl/intl.dart';
 import 'package:zestyvibe/core/colors.dart';
 import 'package:zestyvibe/data/models/order_modelitem.dart';
 
-
 import 'package:zestyvibe/presentation/blocs/orders_bloc/orders_bloc.dart';
 import 'package:zestyvibe/presentation/screens/screen_orders_detailspage/screen_orders_detailspage.dart';
-
+import 'package:zestyvibe/widgets/custom_appbar.dart';
 
 class OrdersScreen extends StatefulWidget {
   const OrdersScreen({Key? key}) : super(key: key);
@@ -53,7 +52,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   Widget _buildOrderCard(OrderModel order) {
     final dateFormat = DateFormat('MMM dd, yyyy');
-    
+
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       elevation: 2,
@@ -93,13 +92,10 @@ class _OrdersScreenState extends State<OrdersScreen> {
               const SizedBox(height: 8),
               Text(
                 dateFormat.format(order.processedAt),
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 14,
-                ),
+                style: TextStyle(color: Colors.grey[600], fontSize: 14),
               ),
               const SizedBox(height: 12),
-              
+
               // Order items preview
               Row(
                 children: [
@@ -144,11 +140,11 @@ class _OrdersScreenState extends State<OrdersScreen> {
                     ),
                 ],
               ),
-              
+
               const SizedBox(height: 12),
               const Divider(),
               const SizedBox(height: 8),
-              
+
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -157,10 +153,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                     children: [
                       Text(
                         'Total',
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 12,
-                        ),
+                        style: TextStyle(color: Colors.grey[600], fontSize: 12),
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -181,8 +174,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: _getStatusColor(order.financialStatus)
-                              .withOpacity(0.1),
+                          color: _getStatusColor(
+                            order.financialStatus,
+                          ).withOpacity(0.1),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
@@ -201,14 +195,17 @@ class _OrdersScreenState extends State<OrdersScreen> {
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: _getFulfillmentColor(order.fulfillmentStatus)
-                              .withOpacity(0.1),
+                          color: _getFulfillmentColor(
+                            order.fulfillmentStatus,
+                          ).withOpacity(0.1),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
                           order.fulfillmentText,
                           style: TextStyle(
-                            color: _getFulfillmentColor(order.fulfillmentStatus),
+                            color: _getFulfillmentColor(
+                              order.fulfillmentStatus,
+                            ),
                             fontWeight: FontWeight.w600,
                             fontSize: 12,
                           ),
@@ -228,22 +225,13 @@ class _OrdersScreenState extends State<OrdersScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('My Orders'),
-        backgroundColor: Appcolors.kprimarycolor,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              context.read<OrdersBloc>().add(RefreshOrders());
-            },
-          ),
-        ],
-      ),
+      appBar: CustomAppBar(title: 'My orders'),
       body: BlocBuilder<OrdersBloc, OrdersState>(
         builder: (context, state) {
           if (state is OrdersLoading) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(
+              child: CircularProgressIndicator(color: Appcolors.kprimarycolor),
+            );
           }
 
           if (state is OrdersError) {
