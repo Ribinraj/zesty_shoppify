@@ -1,8 +1,7 @@
-
-
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_iconly/flutter_iconly.dart';
 import 'package:zestyvibe/core/colors.dart';
 import 'package:zestyvibe/core/responsiveutils.dart';
 import 'package:zestyvibe/presentation/blocs/bottom_navigation_bloc/bottom_navigation_bloc.dart';
@@ -46,47 +45,47 @@ class BottomNavigationWidget extends StatelessWidget {
             items: [
               BottomNavigationBarItem(
                 icon: Icon(
-                  Icons.dashboard_outlined,
+                  IconlyLight.home,
                   size: ResponsiveUtils.wp(7),
                 ),
                 activeIcon: Icon(
-                  Icons.dashboard_rounded,
+                  IconlyBold.home,
                   size: ResponsiveUtils.wp(7),
                 ),
                 label: "Home",
               ),
               BottomNavigationBarItem(
                 icon: Icon(
-                  Icons.note_add_outlined,
+                  IconlyLight.bag,
                   size: ResponsiveUtils.wp(7),
                 ),
                 activeIcon: Icon(
-                  Icons.note_add_rounded,
+                  IconlyBold.bag,
                   size: ResponsiveUtils.wp(7),
                 ),
-                label: "cart",
+                label: "Cart",
               ),
-                      BottomNavigationBarItem(
+              BottomNavigationBarItem(
                 icon: Icon(
-                  Icons.category_rounded,
+                  IconlyLight.document,
                   size: ResponsiveUtils.wp(7),
                 ),
                 activeIcon: Icon(
-                  Icons.category_rounded,
+                  IconlyBold.document,
                   size: ResponsiveUtils.wp(7),
                 ),
                 label: "Orders",
               ),
               BottomNavigationBarItem(
                 icon: Icon(
-                  Icons.assignment_outlined,
+                  IconlyLight.profile,
                   size: ResponsiveUtils.wp(7),
                 ),
                 activeIcon: Icon(
-                  Icons.assignment_rounded,
+                  IconlyBold.profile,
                   size: ResponsiveUtils.wp(7),
                 ),
-                label: "profile",
+                label: "Profile",
               ),
             ],
           ),

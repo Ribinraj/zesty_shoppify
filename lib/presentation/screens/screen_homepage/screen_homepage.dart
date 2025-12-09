@@ -680,6 +680,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:zestyvibe/core/appconstants.dart';
 
 import 'package:zestyvibe/core/colors.dart';
 import 'package:zestyvibe/core/constants.dart';
@@ -1214,27 +1215,80 @@ class _ShopifyHomePageState extends State<ShopifyHomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        title: Text(
-          'Shop',
-          style: TextStyle(
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.5,
-            fontSize: ResponsiveUtils.sp(4.2),
+appBar: AppBar(
+  backgroundColor: const Color.fromARGB(255, 227, 224, 224),
+  elevation: 0,
+  centerTitle: false,
+  surfaceTintColor: Appcolors.kwhitecolor,
+
+  // ✅ LEFT SIDE LOGO
+  leading: Padding(
+    padding: EdgeInsets.only(left: ResponsiveUtils.wp(3)),
+    child: Center(
+      child: Image.asset(
+      Appconstants.applogo,
+        height: ResponsiveUtils.hp(6),
+        fit: BoxFit.contain,
+      ),
+    ),
+  ),
+
+  title: Text(
+    'Zesty Vibe',
+    style: TextStyle(
+      fontWeight: FontWeight.w700,
+      letterSpacing: 0.5,
+      fontSize: ResponsiveUtils.sp(5),
+      color: Appcolors.kprimarycolor,
+    ),
+  ),
+
+  actions: [
+    // ✅ LOGIN BUTTON (DESIGN CONTAINER)
+    Padding(
+      padding: EdgeInsets.only(
+        right: ResponsiveUtils.wp(3),
+        top: ResponsiveUtils.hp(0.8),
+        bottom: ResponsiveUtils.hp(0.8),
+      ),
+      child: InkWell(
+        onTap: () {
+          // ✅ TODO: Navigate to Login Screen
+        },
+        borderRadius: BorderRadiusStyles.kradius5(),
+        child: Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: ResponsiveUtils.wp(4),
+            vertical: ResponsiveUtils.hp(0.9),
+          ),
+          decoration: BoxDecoration(
+            color: Appcolors.kprimarycolor,
+            borderRadius: BorderRadiusStyles.kradius5(),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.login,
+                size: ResponsiveUtils.sp(3),
+                color: Appcolors.kwhitecolor,
+              ),
+              ResponsiveSizedBox.width5,
+              Text(
+                'Login',
+                style: TextStyle(
+                  fontSize: ResponsiveUtils.sp(2.6),
+                  fontWeight: FontWeight.w600,
+                  color: Appcolors.kwhitecolor,
+                ),
+              ),
+            ],
           ),
         ),
-        backgroundColor: Appcolors.kprimarycolor,
-        elevation: 0,
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.shopping_cart_outlined),
-            onPressed: () {
-              // Navigate to cart
-            },
-          ),
-        ],
       ),
+    ),
+  ],
+),
+
       body: MultiBlocListener(
         listeners: [
           BlocListener<ProductBloc, ProductState>(

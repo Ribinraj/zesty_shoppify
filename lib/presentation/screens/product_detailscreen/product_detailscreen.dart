@@ -3,14 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_html/flutter_html.dart';
+import 'package:flutter_iconly/flutter_iconly.dart';
 
 import 'package:zestyvibe/core/colors.dart' show Appcolors;
+import 'package:zestyvibe/core/responsiveutils.dart';
 import 'package:zestyvibe/data/models/product_detail_model.dart';
-
-
 import 'package:zestyvibe/domain/repositories/apprepo.dart';
 import 'package:zestyvibe/presentation/blocs/cart_bloc/cart_bloc.dart';
 import 'package:zestyvibe/presentation/blocs/product_detial_bloc/product_detail_bloc.dart';
+import 'package:zestyvibe/widgets/custom_snackbar.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final String productHandle;
@@ -28,7 +29,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   @override
   void initState() {
     super.initState();
-    // assume AppRepo.instance is initialized
     _bloc = ProductDetailBloc(repository: AppRepo.instance);
     _bloc.add(LoadProductDetail(widget.productHandle));
   }
@@ -42,52 +42,112 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   Widget _imageCarousel(List<ProductImage> images) {
     if (images.isEmpty) {
       return Container(
-        height: 300,
-        color: Colors.grey[200],
-        child: const Center(child: Icon(Icons.image_not_supported, size: 64)),
+        height: ResponsiveUtils.hp(40),
+        decoration: BoxDecoration(
+          color: Appcolors.kbackgroundcolor,
+          borderRadius: BorderRadius.only(
+            bottomLeft: Radius.circular(ResponsiveUtils.wp(8)),
+            bottomRight: Radius.circular(ResponsiveUtils.wp(8)),
+          ),
+        ),
+        child: Center(
+          child: Icon(
+            Icons.image_not_supported_outlined,
+            size: ResponsiveUtils.wp(20),
+            color: Appcolors.kgreyColor.withOpacity(0.5),
+          ),
+        ),
       );
     }
 
-    return SizedBox(
-      height: 320,
-      child: Stack(
-        alignment: Alignment.bottomCenter,
-        children: [
-          PageView.builder(
+    return Stack(
+      children: [
+        SizedBox(
+          height: ResponsiveUtils.hp(45),
+          child: PageView.builder(
             itemCount: images.length,
             onPageChanged: (i) => setState(() => _currentImageIndex = i),
             itemBuilder: (context, i) {
               final img = images[i];
-              return CachedNetworkImage(
-                imageUrl: img.url,
-                fit: BoxFit.cover,
-                width: double.infinity,
-                placeholder: (c, s) =>
-                    const Center(child: CircularProgressIndicator()),
-                errorWidget: (c, s, e) => const Icon(Icons.broken_image),
+              return Hero(
+                tag: 'product_${widget.productHandle}',
+                child: CachedNetworkImage(
+                  imageUrl: img.url,
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                  placeholder: (c, s) => Container(
+                    color: Appcolors.kbackgroundcolor,
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        color: Appcolors.kprimarycolor,
+                        strokeWidth: 2,
+                      ),
+                    ),
+                  ),
+                  errorWidget: (c, s, e) => Container(
+                    color: Appcolors.kbackgroundcolor,
+                    child: Icon(
+                      Icons.broken_image_outlined,
+                      size: ResponsiveUtils.wp(20),
+                      color: Appcolors.kgreyColor,
+                    ),
+                  ),
+                ),
               );
             },
           ),
+        ),
+        // Gradient overlay at bottom for better dot visibility
+        Positioned(
+          bottom: 0,
+          left: 0,
+          right: 0,
+          child: Container(
+            height: ResponsiveUtils.hp(8),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.transparent,
+                  Appcolors.kblackcolor.withOpacity(0.3),
+                ],
+              ),
+            ),
+          ),
+        ),
+        // Page indicators
+        if (images.length > 1)
           Positioned(
-            bottom: 8,
+            bottom: ResponsiveUtils.hp(2),
+            left: 0,
+            right: 0,
             child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: List.generate(images.length, (index) {
-                return Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  width: _currentImageIndex == index ? 10 : 6,
-                  height: 6,
+                final isActive = _currentImageIndex == index;
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  margin: EdgeInsets.symmetric(
+                    horizontal: ResponsiveUtils.wp(1),
+                  ),
+                  width: isActive
+                      ? ResponsiveUtils.wp(6)
+                      : ResponsiveUtils.wp(2),
+                  height: ResponsiveUtils.wp(2),
                   decoration: BoxDecoration(
-                    color: _currentImageIndex == index
-                        ? Colors.white
-                        : Colors.white54,
-                    borderRadius: BorderRadius.circular(4),
+                    color: isActive
+                        ? Appcolors.kwhitecolor
+                        : Appcolors.kwhitecolor.withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(
+                      ResponsiveUtils.wp(2),
+                    ),
                   ),
                 );
               }),
             ),
           ),
-        ],
-      ),
+      ],
     );
   }
 
@@ -98,54 +158,207 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     _selectedVariant =
         _selectedVariant ?? state.selectedVariant ?? variants.first;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8),
+    return Container(
+      margin: EdgeInsets.symmetric(
+        horizontal: ResponsiveUtils.wp(4),
+        vertical: ResponsiveUtils.hp(1),
+      ),
+      padding: EdgeInsets.all(ResponsiveUtils.wp(4)),
+      decoration: BoxDecoration(
+        color: Appcolors.kwhitecolor,
+        borderRadius: BorderRadius.circular(ResponsiveUtils.wp(3)),
+        boxShadow: [
+          BoxShadow(
+            color: Appcolors.kprimarycolor.withOpacity(0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Select variant',
-            style: TextStyle(fontWeight: FontWeight.w600),
+          Row(
+            children: [
+              Icon(
+                IconlyLight.category,
+                size: ResponsiveUtils.wp(5),
+                color: Appcolors.kprimarycolor,
+              ),
+              SizedBox(width: ResponsiveUtils.wp(2)),
+              Text(
+                'Select Variant',
+                style: TextStyle(
+                  fontSize: ResponsiveUtils.sp(4.2),
+                  fontWeight: FontWeight.w600,
+                  color: Appcolors.kblackcolor,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
-          DropdownButton<ProductVariant>(
-            isExpanded: true,
-            value: _selectedVariant,
-            items: variants.map((v) {
-              final priceText = v.price != null
-                  ? ' - ₹${v.price!.toStringAsFixed(2)}'
-                  : '';
-              final availability = v.available ? '' : ' (Out of stock)';
-              return DropdownMenuItem<ProductVariant>(
-                value: v,
-                child: Text('${v.title}$priceText$availability'),
-              );
-            }).toList(),
-            onChanged: (val) {
-              setState(() {
-                _selectedVariant = val;
-              });
-            },
+          SizedBox(height: ResponsiveUtils.hp(1.5)),
+          Container(
+            padding: EdgeInsets.symmetric(
+              horizontal: ResponsiveUtils.wp(3),
+              vertical: ResponsiveUtils.hp(0.5),
+            ),
+            decoration: BoxDecoration(
+              color: Appcolors.kbackgroundcolor,
+              borderRadius: BorderRadius.circular(ResponsiveUtils.wp(2)),
+              border: Border.all(
+                color: Appcolors.kprimarycolor.withOpacity(0.2),
+              ),
+            ),
+            child: DropdownButton<ProductVariant>(
+              isExpanded: true,
+              value: _selectedVariant,
+              underline: const SizedBox(),
+              icon: Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: Appcolors.kprimarycolor,
+              ),
+              dropdownColor: Appcolors.kwhitecolor,
+              items: variants.map((v) {
+                final priceText = v.price != null
+                    ? ' - ₹${v.price!.toStringAsFixed(2)}'
+                    : '';
+                final availability = v.available ? '' : ' (Out of stock)';
+                return DropdownMenuItem<ProductVariant>(
+                  value: v,
+                  child: Text(
+                    '${v.title}$priceText$availability',
+                    style: TextStyle(
+                      fontSize: ResponsiveUtils.sp(3.8),
+                      color: v.available
+                          ? Appcolors.kblackcolor
+                          : Appcolors.kgreyColor,
+                    ),
+                  ),
+                );
+              }).toList(),
+              onChanged: (val) {
+                setState(() {
+                  _selectedVariant = val;
+                });
+              },
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _priceArea(ProductVariant? variant) {
+  Widget _priceAndAvailability(ProductVariant? variant) {
     if (variant == null) return const SizedBox.shrink();
     final price = variant.price;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12.0),
+
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: ResponsiveUtils.wp(4)),
+      padding: EdgeInsets.all(ResponsiveUtils.wp(4)),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Appcolors.kprimarycolor.withOpacity(0.1),
+            Appcolors.kbackgroundcolor,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(ResponsiveUtils.wp(3)),
+        border: Border.all(
+          color: Appcolors.kprimarycolor.withOpacity(0.2),
+          width: 1,
+        ),
+      ),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            '₹${price?.toStringAsFixed(2) ?? '-'}',
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Price',
+                style: TextStyle(
+                  fontSize: ResponsiveUtils.sp(3.5),
+                  color: Appcolors.kgreyColor,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              SizedBox(height: ResponsiveUtils.hp(0.5)),
+              Text(
+                '₹${price?.toStringAsFixed(2) ?? '-'}',
+                style: TextStyle(
+                  fontSize: ResponsiveUtils.sp(6.5),
+                  fontWeight: FontWeight.bold,
+                  color: Appcolors.kprimarycolor,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 12),
           if (!variant.available)
-            const Text('Out of stock', style: TextStyle(color: Colors.red)),
+            Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: ResponsiveUtils.wp(4),
+                vertical: ResponsiveUtils.hp(1),
+              ),
+              decoration: BoxDecoration(
+                color: Appcolors.kredcolor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(ResponsiveUtils.wp(2)),
+                border: Border.all(
+                  color: Appcolors.kredcolor.withOpacity(0.3),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.warning_amber_rounded,
+                    color: Appcolors.kredcolor,
+                    size: ResponsiveUtils.wp(4.5),
+                  ),
+                  SizedBox(width: ResponsiveUtils.wp(1.5)),
+                  Text(
+                    'Out of Stock',
+                    style: TextStyle(
+                      color: Appcolors.kredcolor,
+                      fontWeight: FontWeight.w600,
+                      fontSize: ResponsiveUtils.sp(3.5),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: ResponsiveUtils.wp(4),
+                vertical: ResponsiveUtils.hp(1),
+              ),
+              decoration: BoxDecoration(
+                color: Appcolors.kgreencolor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(ResponsiveUtils.wp(2)),
+                border: Border.all(
+                  color: Appcolors.kgreencolor.withOpacity(0.3),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.check_circle_rounded,
+                    color: Appcolors.kgreencolor,
+                    size: ResponsiveUtils.wp(4.5),
+                  ),
+                  SizedBox(width: ResponsiveUtils.wp(1.5)),
+                  Text(
+                    'In Stock',
+                    style: TextStyle(
+                      color: Appcolors.kgreencolor,
+                      fontWeight: FontWeight.w600,
+                      fontSize: ResponsiveUtils.sp(3.5),
+                    ),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );
@@ -156,102 +369,304 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     return BlocProvider<ProductDetailBloc>.value(
       value: _bloc,
       child: Scaffold(
+        backgroundColor: Appcolors.kbackgroundcolor,
+        extendBodyBehindAppBar: true,
         appBar: AppBar(
-          title: const Text('Product'),
-          backgroundColor: Appcolors.kprimarycolor,
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          leading: Container(
+            margin: EdgeInsets.all(ResponsiveUtils.wp(2)),
+            decoration: BoxDecoration(
+              color: Appcolors.kwhitecolor.withOpacity(0.9),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Appcolors.kblackcolor.withOpacity(0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: IconButton(
+              icon: Icon(
+                Icons.arrow_back_ios_new_rounded,
+                color: Appcolors.kblackcolor,
+                size: ResponsiveUtils.wp(5),
+              ),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ),
+          // actions: [
+          //   Container(
+          //     margin: EdgeInsets.all(ResponsiveUtils.wp(2)),
+          //     decoration: BoxDecoration(
+          //       color: Appcolors.kwhitecolor.withOpacity(0.9),
+          //       shape: BoxShape.circle,
+          //       boxShadow: [
+          //         BoxShadow(
+          //           color: Appcolors.kblackcolor.withOpacity(0.1),
+          //           blurRadius: 8,
+          //           offset: const Offset(0, 2),
+          //         ),
+          //       ],
+          //     ),
+          //     child: IconButton(
+          //       icon: Icon(
+          //         IconlyLight.heart,
+          //         color: Appcolors.kprimarycolor,
+          //         size: ResponsiveUtils.wp(6),
+          //       ),
+          //       onPressed: () {
+          //         // Add to wishlist functionality
+          //       },
+          //     ),
+          //   ),
+          // ],
         ),
         body: BlocBuilder<ProductDetailBloc, ProductDetailState>(
           builder: (context, state) {
             if (state is ProductDetailLoading) {
-              return const Center(child: CircularProgressIndicator());
+              return Center(
+                child: CircularProgressIndicator(
+                  color: Appcolors.kprimarycolor,
+                ),
+              );
             }
 
             if (state is ProductDetailError) {
-              return Center(child: Text('Error: ${state.message}'));
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.error_outline_rounded,
+                      size: ResponsiveUtils.wp(20),
+                      color: Appcolors.kredcolor,
+                    ),
+                    SizedBox(height: ResponsiveUtils.hp(2)),
+                    Text(
+                      'Oops! Something went wrong',
+                      style: TextStyle(
+                        fontSize: ResponsiveUtils.sp(5),
+                        fontWeight: FontWeight.w600,
+                        color: Appcolors.kblackcolor,
+                      ),
+                    ),
+                    SizedBox(height: ResponsiveUtils.hp(1)),
+                    Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: ResponsiveUtils.wp(10),
+                      ),
+                      child: Text(
+                        state.message,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: ResponsiveUtils.sp(3.5),
+                          color: Appcolors.kgreyColor,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
             }
 
             if (state is ProductDetailLoaded) {
               final product = state.product;
 
-              return SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _imageCarousel(product.images),
-                    const SizedBox(height: 12),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                      child: Text(
-                        product.title,
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
+              return Stack(
+                children: [
+                  SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _imageCarousel(product.images),
+                        SizedBox(height: ResponsiveUtils.hp(2)),
+                        
+                        // Product Title
+                        Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: ResponsiveUtils.wp(4),
+                          ),
+                          child: Text(
+                            product.title,
+                            style: TextStyle(
+                              fontSize: ResponsiveUtils.sp(5.5),
+                              fontWeight: FontWeight.bold,
+                              color: Appcolors.kblackcolor,
+                              height: 1.3,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    _priceArea(_selectedVariant ?? state.selectedVariant),
-                    const SizedBox(height: 8),
-                    _variantSelector(state),
-                    const SizedBox(height: 12),
-
-                    // Description (basic HTML rendering)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                      child:
-                          product.descriptionHtml != null &&
-                              product.descriptionHtml!.isNotEmpty
-                          ? Html(data: product.descriptionHtml!)
-                          : const Text('No description'),
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    // Add to Cart button (placeholder - you should hook to cart flow)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                      child: SizedBox(
-                        width: double.infinity,
-                        height: 48,
-                        child: ElevatedButton(
-                          onPressed:
-                              (_selectedVariant ?? state.selectedVariant)
-                                      ?.available ==
-                                  true
-                              ? () {
-                                  // example inside ProductDetailScreen where you handle Add to Cart:
-                                  final variantId = _selectedVariant
-                                      ?.id; // should be the variant gid (e.g. "gid://shopify/ProductVariant/123")
-                                  if (variantId != null) {
-                                    context.read<CartBloc>().add(
-                                      AddItemToCart(
-                                        merchandiseId: variantId,
-                                        quantity: 1,
-                                      ),
-                                    );
-                                    // optionally navigate to cart screen
-                                  }
-
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Add to cart pressed (hook me)',
+                        
+                        SizedBox(height: ResponsiveUtils.hp(2)),
+                        
+                        // Price and Availability
+                        _priceAndAvailability(
+                          _selectedVariant ?? state.selectedVariant,
+                        ),
+                        
+                        SizedBox(height: ResponsiveUtils.hp(1.5)),
+                        
+                        // Variant Selector
+                        _variantSelector(state),
+                        
+                        SizedBox(height: ResponsiveUtils.hp(2)),
+                        
+                        // Description Section
+                        Container(
+                          margin: EdgeInsets.symmetric(
+                            horizontal: ResponsiveUtils.wp(4),
+                          ),
+                          padding: EdgeInsets.all(ResponsiveUtils.wp(4)),
+                          decoration: BoxDecoration(
+                            color: Appcolors.kwhitecolor,
+                            borderRadius: BorderRadius.circular(
+                              ResponsiveUtils.wp(3),
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Appcolors.kprimarycolor.withOpacity(0.08),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    IconlyLight.document,
+                                    size: ResponsiveUtils.wp(5),
+                                    color: Appcolors.kprimarycolor,
+                                  ),
+                                  SizedBox(width: ResponsiveUtils.wp(2)),
+                                  Text(
+                                    'Product Description',
+                                    style: TextStyle(
+                                      fontSize: ResponsiveUtils.sp(4.2),
+                                      fontWeight: FontWeight.w600,
+                                      color: Appcolors.kblackcolor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              SizedBox(height: ResponsiveUtils.hp(1.5)),
+                              product.descriptionHtml != null &&
+                                      product.descriptionHtml!.isNotEmpty
+                                  ? Html(
+                                      data: product.descriptionHtml!,
+                                      style: {
+                                        "body": Style(
+                                          fontSize: FontSize(
+                                            ResponsiveUtils.sp(3.8),
+                                          ),
+                                          color: Appcolors.kgreyColor,
+                                          lineHeight: const LineHeight(1.6),
+                                        ),
+                                      },
+                                    )
+                                  : Text(
+                                      'No description available',
+                                      style: TextStyle(
+                                        fontSize: ResponsiveUtils.sp(3.8),
+                                        color: Appcolors.kgreyColor,
+                                        fontStyle: FontStyle.italic,
                                       ),
                                     ),
-                                  );
-                                }
-                              : null,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Appcolors.kprimarycolor,
+                            ],
                           ),
-                          child: const Text('Add to Cart'),
+                        ),
+                        
+                        SizedBox(height: ResponsiveUtils.hp(12)),
+                      ],
+                    ),
+                  ),
+                  
+                  // Fixed Add to Cart Button at Bottom
+                  Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    child: Container(
+                      padding: EdgeInsets.all(ResponsiveUtils.wp(4)),
+                      decoration: BoxDecoration(
+                        color: Appcolors.kwhitecolor,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Appcolors.kblackcolor.withOpacity(0.1),
+                            blurRadius: 20,
+                            offset: const Offset(0, -5),
+                          ),
+                        ],
+                        borderRadius: BorderRadius.only(
+                          topLeft: Radius.circular(ResponsiveUtils.wp(6)),
+                          topRight: Radius.circular(ResponsiveUtils.wp(6)),
+                        ),
+                      ),
+                      child: SafeArea(
+                        top: false,
+                        child: SizedBox(
+                          width: double.infinity,
+                          height: ResponsiveUtils.hp(6.5),
+                          child: ElevatedButton(
+                            onPressed: (_selectedVariant ??
+                                        state.selectedVariant)
+                                    ?.available ==
+                                true
+                                ? () {
+                                    final variantId = _selectedVariant?.id;
+                                    if (variantId != null) {
+                                      context.read<CartBloc>().add(
+                                            AddItemToCart(
+                                              merchandiseId: variantId,
+                                              quantity: 1,
+                                            ),
+                                          );
+                                    }
+
+                           CustomSnackbar.show(context, message:  'Added to cart successfully!', type:SnackbarType.success);
+                                  }
+                                : null,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Appcolors.kprimarycolor,
+                              disabledBackgroundColor:
+                                  Appcolors.kgreyColor.withOpacity(0.3),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(
+                                  ResponsiveUtils.wp(3),
+                                ),
+                              ),
+                              elevation: 0,
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  IconlyBold.bag,
+                                  color: Appcolors.kwhitecolor,
+                                  size: ResponsiveUtils.wp(5.5),
+                                ),
+                                SizedBox(width: ResponsiveUtils.wp(2)),
+                                Text(
+                                  'Add to Cart',
+                                  style: TextStyle(
+                                    fontSize: ResponsiveUtils.sp(4.5),
+                                    fontWeight: FontWeight.w600,
+                                    color: Appcolors.kwhitecolor,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     ),
-
-                    const SizedBox(height: 24),
-                  ],
-                ),
+                  ),
+                ],
               );
             }
 
@@ -261,6 +676,4 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       ),
     );
   }
-  //////////---------searchoption----------////////////////
-  
 }
