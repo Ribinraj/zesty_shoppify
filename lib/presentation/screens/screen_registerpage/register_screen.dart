@@ -82,7 +82,7 @@ import 'package:zestyvibe/core/constants.dart';
 import 'package:zestyvibe/presentation/blocs/auth_bloc/auth_bloc.dart';
 import 'package:zestyvibe/core/colors.dart';
 import 'package:zestyvibe/core/responsiveutils.dart';
-import 'package:zestyvibe/presentation/screens/screen_mainpage/screen_mainpage.dart';
+
 import 'package:zestyvibe/widgets/customnavigation.dart';
 import 'package:zestyvibe/widgets/custom_snackbar.dart';
 

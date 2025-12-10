@@ -387,45 +387,45 @@ class ProfileScreen extends StatelessWidget {
                     SizedBox(height: ResponsiveUtils.hp(3)),
 
                     // Logout Button
-                    Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: ResponsiveUtils.wp(4),
-                      ),
-                      child: Container(
-                        height: ResponsiveUtils.hp(6.5),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadiusStyles.kradius15(),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Appcolors.kprimarycolor.withOpacity(0.3),
-                              blurRadius: 10,
-                              offset: const Offset(0, 5),
-                            ),
-                          ],
-                        ),
-                        child: ElevatedButton.icon(
-                          onPressed: () {
-                            context.read<AuthBloc>().add(AuthLogoutRequested());
-                          },
-                          icon: Icon(
-                            Icons.logout,
-                            size: ResponsiveUtils.sp(5),
-                            color: Appcolors.kwhitecolor,
-                          ),
-                          label: TextStyles.body(
-                            text: 'Logout',
-                            color: Appcolors.kwhitecolor,
-                            weight: FontWeight.bold,
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Appcolors.kprimarycolor,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadiusStyles.kradius15(),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
+                    // Padding(
+                    //   padding: EdgeInsets.symmetric(
+                    //     horizontal: ResponsiveUtils.wp(4),
+                    //   ),
+                    //   child: Container(
+                    //     height: ResponsiveUtils.hp(6.5),
+                    //     decoration: BoxDecoration(
+                    //       borderRadius: BorderRadiusStyles.kradius15(),
+                    //       boxShadow: [
+                    //         BoxShadow(
+                    //           color: Appcolors.kprimarycolor.withOpacity(0.3),
+                    //           blurRadius: 10,
+                    //           offset: const Offset(0, 5),
+                    //         ),
+                    //       ],
+                    //     ),
+                    //     child: ElevatedButton.icon(
+                    //       onPressed: () {
+                    //         context.read<AuthBloc>().add(AuthLogoutRequested());
+                    //       },
+                    //       icon: Icon(
+                    //         Icons.logout,
+                    //         size: ResponsiveUtils.sp(5),
+                    //         color: Appcolors.kwhitecolor,
+                    //       ),
+                    //       label: TextStyles.body(
+                    //         text: 'Logout',
+                    //         color: Appcolors.kwhitecolor,
+                    //         weight: FontWeight.bold,
+                    //       ),
+                    //       style: ElevatedButton.styleFrom(
+                    //         backgroundColor: Appcolors.kprimarycolor,
+                    //         shape: RoundedRectangleBorder(
+                    //           borderRadius: BorderRadiusStyles.kradius15(),
+                    //         ),
+                    //       ),
+                    //     ),
+                    //   ),
+                    // ),
                     SizedBox(height: ResponsiveUtils.hp(3)),
                   ],
                 ),
