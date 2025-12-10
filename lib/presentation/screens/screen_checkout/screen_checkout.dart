@@ -47,7 +47,7 @@
 //             });
 
 //             // Check if checkout is complete
-//             if (url.contains('/thank_you') || 
+//             if (url.contains('/thank_you') ||
 //                 url.contains('/orders/') ||
 //                 url.contains('checkout/thank_you')) {
 //               _handleCheckoutComplete();
@@ -90,7 +90,7 @@
 //       _controller.goBack();
 //       return false;
 //     }
-    
+
 //     // Show confirmation dialog
 //     final shouldPop = await showDialog<bool>(
 //       context: context,
@@ -109,7 +109,7 @@
 //         ],
 //       ),
 //     );
-    
+
 //     return shouldPop ?? false;
 //   }
 
@@ -155,16 +155,18 @@
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:zestyvibe/core/colors.dart';
+import 'package:zestyvibe/core/constants.dart';
+import 'package:zestyvibe/core/responsiveutils.dart';
 
 class CheckoutScreen extends StatefulWidget {
   final String checkoutUrl;
   final VoidCallback? onCheckoutComplete;
 
   const CheckoutScreen({
-    Key? key,
+    super.key,
     required this.checkoutUrl,
     this.onCheckoutComplete,
-  }) : super(key: key);
+  });
 
   @override
   State<CheckoutScreen> createState() => _CheckoutScreenState();
@@ -214,7 +216,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             });
 
             // Check if checkout is complete
-            if (url.contains('/thank_you') || 
+            if (url.contains('/thank_you') ||
                 url.contains('/orders/') ||
                 url.contains('checkout/thank_you') ||
                 url.contains('/checkouts/') && url.contains('/thank_you')) {
@@ -252,7 +254,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               }
             }
             // Ignore ORB and other subresource errors silently
-            
+
             // Still mark loading as complete on error
             if (mounted && _isLoading) {
               setState(() {
@@ -269,7 +271,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   void _handleCheckoutComplete() {
     // Prevent multiple calls
     if (!mounted) return;
-    
+
     // Show success message
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -290,7 +292,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Future<bool> _onWillPop() async {
     // Don't allow back navigation while processing checkout completion
-    if (_currentUrl.contains('/thank_you') || 
+    if (_currentUrl.contains('/thank_you') ||
         _currentUrl.contains('/orders/')) {
       return false;
     }
@@ -299,13 +301,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       _controller.goBack();
       return false;
     }
-    
+
     // Show confirmation dialog
     final shouldPop = await showDialog<bool>(
+      // ignore: use_build_context_synchronously
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Cancel Checkout?'),
-        content: const Text('Are you sure you want to leave checkout? Your cart will be saved.'),
+        content: const Text(
+          'Are you sure you want to leave checkout? Your cart will be saved.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -313,15 +318,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: Text(
-              'Yes',
-              style: TextStyle(color: Colors.red),
-            ),
+            child: Text('Yes', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
     );
-    
+
     return shouldPop ?? false;
   }
 
@@ -331,8 +333,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       onWillPop: _onWillPop,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Secure Checkout'),
-          backgroundColor: Appcolors.kprimarycolor,
+          leading: IconButton(
+            onPressed: () => Navigator.pop(context),
+            icon: Icon(
+              Icons.chevron_left,
+              size: ResponsiveUtils.wp(8),
+              color: Appcolors.kprimarycolor,
+            ),
+          ),
+          title: TextStyles.subheadline(
+            text: "Secure Checkout",
+            color: Appcolors.kprimarycolor,
+          ),
+          backgroundColor: const Color.fromARGB(255, 215, 214, 214),
           elevation: 0,
           actions: [
             // Show a subtle loading indicator in app bar
@@ -344,6 +357,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     width: 20,
                     height: 20,
                     child: CircularProgressIndicator(
+                      color: Appcolors.kprimarycolor,
                       strokeWidth: 2,
                       valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                     ),
@@ -375,13 +389,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      CircularProgressIndicator(),
+                      CircularProgressIndicator(color: Appcolors.kprimarycolor),
                       SizedBox(height: 16),
                       Text(
                         'Loading secure checkout...',
                         style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey,
+                          fontSize: 12,
+                          color: Appcolors.kprimarycolor,
                         ),
                       ),
                     ],

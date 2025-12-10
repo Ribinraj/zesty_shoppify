@@ -448,27 +448,29 @@ class ProfileScreen extends StatelessWidget {
                   text: 'Not logged in',
                   color: Appcolors.kgreyColor,
                 ),
-                SizedBox(height: ResponsiveUtils.hp(2)),
+            
+                          SizedBox(height: ResponsiveUtils.hp(1)),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: ResponsiveUtils.wp(10)),
+            child: TextStyles.medium(
+              text: 'Login to view your profile',
+              color: Appcolors.kgreyColor,
+            ),
+          ),
+          SizedBox(height: ResponsiveUtils.hp(2)),
                 Container(
                   decoration: BoxDecoration(
                     borderRadius: BorderRadiusStyles.kradius10(),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Appcolors.kprimarycolor.withOpacity(0.3),
-                        blurRadius: 10,
-                        offset: const Offset(0, 5),
-                      ),
-                    ],
                   ),
                   child: ElevatedButton(
                     onPressed: () => Navigator.of(context).push(
                       MaterialPageRoute(builder: (_) => const LoginScreen()),
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Appcolors.kprimarycolor,
+                      backgroundColor: const Color.fromARGB(255, 220, 218, 217),
                       padding: EdgeInsets.symmetric(
                         horizontal: ResponsiveUtils.wp(10),
-                        vertical: ResponsiveUtils.hp(1.5),
+                        vertical: ResponsiveUtils.hp(1.2),
                       ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadiusStyles.kradius10(),
@@ -476,7 +478,7 @@ class ProfileScreen extends StatelessWidget {
                     ),
                     child: TextStyles.body(
                       text: 'Login',
-                      color: Appcolors.kwhitecolor,
+                      color: Appcolors.kprimarycolor,
                       weight: FontWeight.bold,
                     ),
                   ),

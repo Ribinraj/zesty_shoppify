@@ -139,9 +139,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     color: isActive
                         ? Appcolors.kwhitecolor
                         : Appcolors.kwhitecolor.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(
-                      ResponsiveUtils.wp(2),
-                    ),
+                    borderRadius: BorderRadius.circular(ResponsiveUtils.wp(2)),
                   ),
                 );
               }),
@@ -256,7 +254,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       margin: EdgeInsets.symmetric(horizontal: ResponsiveUtils.wp(4)),
       padding: EdgeInsets.all(ResponsiveUtils.wp(4)),
       decoration: BoxDecoration(
- color: Appcolors.kwhitecolor,        borderRadius: BorderRadius.circular(ResponsiveUtils.wp(3)),
+        color: Appcolors.kwhitecolor,
+        borderRadius: BorderRadius.circular(ResponsiveUtils.wp(3)),
         border: Border.all(
           color: Appcolors.kprimarycolor.withOpacity(0.2),
           width: 1,
@@ -296,9 +295,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               decoration: BoxDecoration(
                 color: Appcolors.kredcolor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(ResponsiveUtils.wp(2)),
-                border: Border.all(
-                  color: Appcolors.kredcolor.withOpacity(0.3),
-                ),
+                border: Border.all(color: Appcolors.kredcolor.withOpacity(0.3)),
               ),
               child: Row(
                 children: [
@@ -474,7 +471,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       children: [
                         _imageCarousel(product.images),
                         SizedBox(height: ResponsiveUtils.hp(2)),
-                        
+
                         // Product Title
                         Padding(
                           padding: EdgeInsets.symmetric(
@@ -490,21 +487,21 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             ),
                           ),
                         ),
-                        
+
                         SizedBox(height: ResponsiveUtils.hp(2)),
-                        
+
                         // Price and Availability
                         _priceAndAvailability(
                           _selectedVariant ?? state.selectedVariant,
                         ),
-                        
+
                         SizedBox(height: ResponsiveUtils.hp(1.5)),
-                        
+
                         // Variant Selector
                         _variantSelector(state),
-                        
+
                         SizedBox(height: ResponsiveUtils.hp(2)),
-                        
+
                         // Description Section
                         Container(
                           margin: EdgeInsets.symmetric(
@@ -518,7 +515,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: Appcolors.kprimarycolor.withOpacity(0.08),
+                                color: Appcolors.kprimarycolor.withOpacity(
+                                  0.08,
+                                ),
                                 blurRadius: 12,
                                 offset: const Offset(0, 4),
                               ),
@@ -571,12 +570,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             ],
                           ),
                         ),
-                        
+
                         SizedBox(height: ResponsiveUtils.hp(12)),
                       ],
                     ),
                   ),
-                  
+
                   // Fixed Add to Cart Button at Bottom
                   Positioned(
                     bottom: 0,
@@ -602,30 +601,39 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         top: false,
                         child: SizedBox(
                           width: double.infinity,
-                          height: ResponsiveUtils.hp(6.5),
+                          height: ResponsiveUtils.hp(5.5),
                           child: ElevatedButton(
-                            onPressed: (_selectedVariant ??
-                                        state.selectedVariant)
-                                    ?.available ==
-                                true
+                            onPressed:
+                                (_selectedVariant ?? state.selectedVariant)
+                                        ?.available ==
+                                    true
                                 ? () {
                                     final variantId = _selectedVariant?.id;
                                     if (variantId != null) {
                                       context.read<CartBloc>().add(
-                                            AddItemToCart(
-                                              merchandiseId: variantId,
-                                              quantity: 1,
-                                            ),
-                                          );
+                                        AddItemToCart(
+                                          merchandiseId: variantId,
+                                          quantity: 1,
+                                        ),
+                                      );
                                     }
 
-                           CustomSnackbar.show(context, message:  'Added to cart successfully!', type:SnackbarType.success);
+                                    CustomSnackbar.show(
+                                      context,
+                                      message: 'Added to cart successfully!',
+                                      type: SnackbarType.success,
+                                    );
                                   }
                                 : null,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Appcolors.kprimarycolor,
-                              disabledBackgroundColor:
-                                  Appcolors.kgreyColor.withOpacity(0.3),
+                              backgroundColor: const Color.fromARGB(
+                                255,
+                                216,
+                                216,
+                                215,
+                              ),
+                              disabledBackgroundColor: Appcolors.kgreyColor
+                                  .withOpacity(0.3),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(
                                   ResponsiveUtils.wp(3),
@@ -638,16 +646,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               children: [
                                 Icon(
                                   IconlyBold.bag,
-                                  color: Appcolors.kwhitecolor,
-                                  size: ResponsiveUtils.wp(5.5),
+                                  color: Appcolors.kprimarycolor,
+                                  size: ResponsiveUtils.wp(5),
                                 ),
                                 SizedBox(width: ResponsiveUtils.wp(2)),
                                 Text(
                                   'Add to Cart',
                                   style: TextStyle(
-                                    fontSize: ResponsiveUtils.sp(4.5),
+                                    fontSize: ResponsiveUtils.sp(4),
                                     fontWeight: FontWeight.w600,
-                                    color: Appcolors.kwhitecolor,
+                                    color: Appcolors.kprimarycolor,
                                     letterSpacing: 0.5,
                                   ),
                                 ),
