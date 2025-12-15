@@ -4,6 +4,7 @@ import 'package:bloc/bloc.dart';
 import 'package:meta/meta.dart';
 import 'package:zestyvibe/data/models/customer_model.dart';
 import 'package:zestyvibe/domain/repositories/apprepo.dart';
+import 'package:zestyvibe/domain/repositories/pushnotification_controller.dart';
 
 part 'auth_event.dart';
 part 'auth_state.dart';
@@ -33,59 +34,149 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       emit(AuthUnauthenticated());
     }
   }
+FutureOr<void> _onLogin(
+  AuthLoginRequested event,
+  Emitter<AuthState> emit,
+) async {
+  emit(AuthLoading());
 
-  FutureOr<void> _onLogin(AuthLoginRequested event, Emitter<AuthState> emit) async {
-    emit(AuthLoading());
-    final resp = await repository.loginCustomer(email: event.email, password: event.password);
-    if (resp.error) {
-      emit(AuthError(resp.message));
-      return;
-    }
-    final prof = await repository.fetchCustomer();
-    if (prof.error || prof.data == null) {
-      emit(AuthError(prof.message));
-      return;
-    }
-    final customer = CustomerModel.fromGraphQL(prof.data!);
-    emit(AuthAuthenticated(customer));
+  final loginResp = await repository.loginCustomer(
+    email: event.email,
+    password: event.password,
+  );
+
+  if (loginResp.error) {
+    emit(AuthError(loginResp.message));
+    return;
   }
 
-  FutureOr<void> _onLogout(AuthLogoutRequested event, Emitter<AuthState> emit) async {
-    emit(AuthLoading());
-    final resp = await repository.logoutCustomer();
-    if (resp.error) {
-      emit(AuthError(resp.message));
-      return;
-    }
-    emit(AuthUnauthenticated());
+  final profileResp = await repository.fetchCustomer();
+  if (profileResp.error || profileResp.data == null) {
+    emit(AuthError(profileResp.message));
+    return;
   }
 
-  FutureOr<void> _onRegister(AuthRegisterRequested event, Emitter<AuthState> emit) async {
-    emit(AuthLoading());
-    final resp = await repository.registerCustomer(
-      firstName: event.firstName,
-      lastName: event.lastName,
-      email: event.email,
-      password: event.password,
-    );
-    if (resp.error) {
-      emit(AuthError(resp.message));
-      return;
-    }
-    // auto-login after register
-    final login = await repository.loginCustomer(email: event.email, password: event.password);
-    if (login.error) {
-      emit(AuthError('Registered but login failed: ${login.message}'));
-      return;
-    }
-    final prof = await repository.fetchCustomer();
-    if (prof.error || prof.data == null) {
-      emit(AuthError(prof.message));
-      return;
-    }
-    final customer = CustomerModel.fromGraphQL(prof.data!);
-    emit(AuthAuthenticated(customer));
+  final customer = CustomerModel.fromGraphQL(profileResp.data!);
+
+  // 🔥 THIS IS WHERE YOU CALL IT
+  await repository.sendFcmTokenToServer();
+
+  emit(AuthAuthenticated(customer));
+}
+
+  // FutureOr<void> _onLogin(AuthLoginRequested event, Emitter<AuthState> emit) async {
+  //   emit(AuthLoading());
+  //   final resp = await repository.loginCustomer(email: event.email, password: event.password);
+  //   if (resp.error) {
+  //     emit(AuthError(resp.message));
+  //     return;
+  //   }
+  //   final prof = await repository.fetchCustomer();
+  //   if (prof.error || prof.data == null) {
+  //     emit(AuthError(prof.message));
+  //     return;
+  //   }
+  //   final customer = CustomerModel.fromGraphQL(prof.data!);
+  //   emit(AuthAuthenticated(customer));
+  // }
+FutureOr<void> _onLogout(
+  AuthLogoutRequested event,
+  Emitter<AuthState> emit,
+) async {
+  emit(AuthLoading());
+
+  // 1️⃣ Logout from Shopify / backend
+  final resp = await repository.logoutCustomer();
+  if (resp.error) {
+    emit(AuthError(resp.message));
+    return;
   }
+
+  // 2️⃣ Delete FCM token + notifications
+  await PushNotifications.instance.deleteDeviceToken();
+
+  // 3️⃣ Emit unauthenticated state
+  emit(AuthUnauthenticated());
+}
+
+  // FutureOr<void> _onLogout(AuthLogoutRequested event, Emitter<AuthState> emit) async {
+  //   emit(AuthLoading());
+  //   final resp = await repository.logoutCustomer();
+  //   if (resp.error) {
+  //     emit(AuthError(resp.message));
+  //     return;
+  //   }
+  //   emit(AuthUnauthenticated());
+  // }
+FutureOr<void> _onRegister(
+  AuthRegisterRequested event,
+  Emitter<AuthState> emit,
+) async {
+  emit(AuthLoading());
+
+  final resp = await repository.registerCustomer(
+    firstName: event.firstName,
+    lastName: event.lastName,
+    email: event.email,
+    password: event.password,
+  );
+
+  if (resp.error) {
+    emit(AuthError(resp.message));
+    return;
+  }
+
+  // auto-login after register
+  final login = await repository.loginCustomer(
+    email: event.email,
+    password: event.password,
+  );
+
+  if (login.error) {
+    emit(AuthError('Registered but login failed: ${login.message}'));
+    return;
+  }
+
+  final prof = await repository.fetchCustomer();
+  if (prof.error || prof.data == null) {
+    emit(AuthError(prof.message));
+    return;
+  }
+
+  final customer = CustomerModel.fromGraphQL(prof.data!);
+
+  // 🔥 ADD THIS LINE (same as login)
+  await repository.sendFcmTokenToServer();
+
+  emit(AuthAuthenticated(customer));
+}
+
+  // FutureOr<void> _onRegister(AuthRegisterRequested event, Emitter<AuthState> emit) async {
+  //   emit(AuthLoading());
+  //   final resp = await repository.registerCustomer(
+  //     firstName: event.firstName,
+  //     lastName: event.lastName,
+  //     email: event.email,
+  //     password: event.password,
+  //   );
+  //   if (resp.error) {
+  //     emit(AuthError(resp.message));
+  //     return;
+  //   }
+  //   // auto-login after register
+  //   final login = await repository.loginCustomer(email: event.email, password: event.password);
+  //   if (login.error) {
+  //     emit(AuthError('Registered but login failed: ${login.message}'));
+  //     return;
+  //   }
+  //   final prof = await repository.fetchCustomer();
+  //   if (prof.error || prof.data == null) {
+  //     emit(AuthError(prof.message));
+  //     return;
+  //   }
+  //   final customer = CustomerModel.fromGraphQL(prof.data!);
+  //   emit(AuthAuthenticated(customer));
+  // }
     FutureOr<void> _onUpdateProfile(
     AuthUpdateProfileRequested event,
     Emitter<AuthState> emit,

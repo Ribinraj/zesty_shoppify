@@ -11,6 +11,7 @@ import 'package:zestyvibe/data/models/collection_model.dart';
 import 'package:zestyvibe/data/models/order_modelitem.dart';
 import 'package:zestyvibe/data/models/product_detail_model.dart';
 import 'package:zestyvibe/data/models/product_model.dart';
+import 'package:zestyvibe/data/models/token_model.dart';
 import 'package:zestyvibe/domain/token_storage.dart';
 
 import 'package:zestyvibe/core/urls.dart';
@@ -1696,6 +1697,75 @@ Future<ApiResponse<Map<String, dynamic>>> setDefaultCustomerAddress({
     error: false,
     status: 200,
   );
+}
+/////////////-------------update token-----------////////////////////////////
+Future<void> updatetoken({required UserModel user}) async {
+  try {
+    log("📤 Sending FCM Token Update Request...");
+
+    final response = await dio.post(
+      'https://crisantdemo.in/zesty/api/push',
+      data: user.toJson(), // ✅ JSON
+    );
+
+    final data = response.data;
+
+    log("📥 RESPONSE RECEIVED");
+    log("Response Data: $data");
+
+    // ✅ ONLY CHECK BACKEND FLAGS
+    final bool isError = data['error'] == true;
+    final int status = data['status'] ?? 0;
+    final String message = data['message']?.toString() ?? '';
+
+    if (!isError && status == 200) {
+      log("✅ FCM token updated successfully");
+    } else {
+      log("❌ Token update failed: $message");
+    }
+  } catch (e, s) {
+    log("🔥 ERROR updating FCM token: $e\n$s");
+  }
+}
+
+
+Future<void> sendFcmTokenToServer() async {
+  try {
+    // 1️⃣ Get FCM token stored by PushNotifications
+    final prefs = await SharedPreferences.getInstance();
+    final fcmToken = prefs.getString('FCM_TOKEN');
+
+    if (fcmToken == null) {
+      log('❌ No FCM token found');
+      return;
+    }
+
+    // 2️⃣ Fetch logged-in customer (Shopify)
+    final customerResp = await fetchCustomer();
+
+    if (customerResp.error || customerResp.data == null) {
+      log('❌ User not logged in or customer fetch failed');
+      return;
+    }
+
+    final customer = customerResp.data!;
+
+    // 3️⃣ Build UserModel for backend
+    final user = UserModel(
+      userId: customer['id'],
+      userName:
+          '${customer['firstName'] ?? ''} ${customer['lastName'] ?? ''}'.trim(),
+      userEmail: customer['email'],
+      userMobile: customer['phone'],
+      userToken: fcmToken,
+    );
+
+    // 4️⃣ Call backend API
+    await updatetoken(user: user);
+
+  } catch (e, s) {
+    log('sendFcmTokenToServer error: $e\n$s');
+  }
 }
 
 }

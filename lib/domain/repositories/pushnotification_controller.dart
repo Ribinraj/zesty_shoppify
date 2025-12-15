@@ -10,6 +10,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:zestyvibe/domain/repositories/apprepo.dart';
 
 /// Top-level background notification tap handler for flutter_local_notifications.
 /// Must be a top-level or static function and annotated as entry point if used for background.
@@ -99,81 +100,98 @@ class PushNotifications {
   }
 
   // Get and persist device FCM token, and listen to refreshes.
-  Future<String?> _getDeviceToken() async {
-    try {
-      final token = await _firebaseMessaging.getToken();
-      debugPrint('FCM Device Token: $token');
+  // Future<String?> _getDeviceToken() async {
+  //   try {
+  //     final token = await _firebaseMessaging.getToken();
+  //     debugPrint('FCM Device Token: $token');
 
-      if (token != null) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('FCM_TOKEN', token);
-      }
+  //     if (token != null) {
+  //       final prefs = await SharedPreferences.getInstance();
+  //       await prefs.setString('FCM_TOKEN', token);
+  //     }
 
-      _firebaseMessaging.onTokenRefresh.listen((newToken) {
-        debugPrint('FCM Token refreshed: $newToken');
-        _storeTokenLocally(newToken);
-        _updateTokenIfLoggedIn(newToken);
-      });
+  //     _firebaseMessaging.onTokenRefresh.listen((newToken) {
+  //       debugPrint('FCM Token refreshed: $newToken');
+  //       _storeTokenLocally(newToken);
+  //       _updateTokenIfLoggedIn(newToken);
+  //     });
 
-      return token;
-    } catch (e) {
-      debugPrint('Error fetching FCM token: $e');
-      return null;
-    }
-  }
+  //     return token;
+  //   } catch (e) {
+  //     debugPrint('Error fetching FCM token: $e');
+  //     return null;
+  //   }
+  // }
+Future<void> _getDeviceToken() async {
+  final token = await _firebaseMessaging.getToken();
 
-  Future<void> _storeTokenLocally(String token) async {
+  if (token != null) {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('FCM_TOKEN', token);
+    log('📱 FCM token saved locally');
   }
 
-  Future<void> _updateTokenIfLoggedIn(String token) async {
+  // Token refresh
+  _firebaseMessaging.onTokenRefresh.listen((newToken) async {
     final prefs = await SharedPreferences.getInstance();
-    final isLoggedIn = prefs.containsKey('USER_TOKEN') &&
-        prefs.getString('USER_TOKEN')?.isNotEmpty == true;
+    await prefs.setString('FCM_TOKEN', newToken);
 
-    if (isLoggedIn) {
-    //  final loginRepo = Loginrepo();
-      try {
-       // await loginRepo.updatetoken(token: token);
-      } catch (e) {
-        debugPrint('Failed to update token on server: $e');
-      }
-    }
-  }
-  /// Call after user logs in to send the stored token to server
-Future<void> sendTokenToServer() async {
-  final prefs = await SharedPreferences.getInstance();
-  String? token = prefs.getString('FCM_TOKEN');
-
-  // 1️⃣ Log what we got from prefs
-  log('sendservertoken (from prefs): $token');
-
-  // 2️⃣ If FCM_TOKEN is null, fetch it from Firebase now
-  if (token == null) {
-    token = await FirebaseMessaging.instance.getToken();
-    log('sendservertoken (fetched from Firebase): $token');
-
-    if (token != null) {
-      await prefs.setString('FCM_TOKEN', token);
-      log('FCM_TOKEN saved to SharedPreferences');
-    }
-  }
-
-  // 3️⃣ If still null, we can’t proceed
-  if (token == null) {
-    log('sendservertoken: still null, skipping server update');
-    return;
-  }
-
-  // 4️⃣ Now call API to update token
-  try {
-    //final loginRepo = Loginrepo();
-    //await loginRepo.updatetoken(token: token);
-  } catch (e) {
-    debugPrint('Failed to send token to server: $e');
-  }
+    // 🔥 If user already logged in → update server
+    await AppRepo.instance.sendFcmTokenToServer();
+  });
 }
+  // Future<void> _storeTokenLocally(String token) async {
+  //   final prefs = await SharedPreferences.getInstance();
+  //   await prefs.setString('FCM_TOKEN', token);
+  // }
+
+  // Future<void> _updateTokenIfLoggedIn(String token) async {
+  //   final prefs = await SharedPreferences.getInstance();
+  //   final isLoggedIn = prefs.containsKey('USER_TOKEN') &&
+  //       prefs.getString('USER_TOKEN')?.isNotEmpty == true;
+
+  //   if (isLoggedIn) {
+  //   final loginRepo = AppRepo.instance;
+  //     try {
+  //      await loginRepo.updatetoken(token: token);
+  //     } catch (e) {
+  //       debugPrint('Failed to update token on server: $e');
+  //     }
+  //   }
+  // }
+  /// Call after user logs in to send the stored token to server
+// Future<void> sendTokenToServer() async {
+//   final prefs = await SharedPreferences.getInstance();
+//   String? token = prefs.getString('FCM_TOKEN');
+
+//   // 1️⃣ Log what we got from prefs
+//   log('sendservertoken (from prefs): $token');
+
+//   // 2️⃣ If FCM_TOKEN is null, fetch it from Firebase now
+//   if (token == null) {
+//     token = await FirebaseMessaging.instance.getToken();
+//     log('sendservertoken (fetched from Firebase): $token');
+
+//     if (token != null) {
+//       await prefs.setString('FCM_TOKEN', token);
+//       log('FCM_TOKEN saved to SharedPreferences');
+//     }
+//   }
+
+//   // 3️⃣ If still null, we can’t proceed
+//   if (token == null) {
+//     log('sendservertoken: still null, skipping server update');
+//     return;
+//   }
+
+//   // 4️⃣ Now call API to update token
+//   try {
+//     final loginRepo = AppRepo.instance;
+//     await loginRepo.updatetoken(token: token);
+//   } catch (e) {
+//     debugPrint('Failed to send token to server: $e');
+//   }
+// }
   // /// Call after user logs in to send the stored token to server
   // Future<void> sendTokenToServer() async {
   //   final prefs = await SharedPreferences.getInstance();
